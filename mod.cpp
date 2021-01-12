@@ -30,7 +30,8 @@ static bool callpy(const char* type, PyObject* val) {
 	return result;
 }
 static void delay(PyObject* func, PyObject* args, unsigned time) {
-	Sleep(time);
+	if(time)
+		Sleep(time);
 	if (PyCallable_Check(func))
 		PyObject_CallOneArg(func, args);
 }
