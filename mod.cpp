@@ -30,7 +30,8 @@ static bool callpy(const char* type, PyObject* val) {
 	return result;
 }
 static void delay(PyObject* func, PyObject* args, unsigned time) {
-	Sleep(time);
+	if(time)
+		Sleep(time);
 	if (PyCallable_Check(func))
 		PyObject_CallOneArg(func, args);
 }
@@ -241,19 +242,39 @@ api_function(getSelectedItem) {
 	}
 	return PyDict_New();
 }
+// 获取玩家背包物品
+api_function(getInventoryItem) {
+	Player* p; int slot;
+	if (PyArg_ParseTuple(args, "Ki:getInventoryItem", &p, &slot)) {
+		if (PlayerCheck(p)) {
+			ItemStack* item = p->getInventoryItem(slot);
+			short iaux = item->mAuxValue;
+			short iid = item->getId();
+			string iname = item->getName();
+			return Py_BuildValue("{s:i,s:i,s:s,s:i}",
+				"itemid", iid,
+				"itemaux", iaux,
+				"itemname", iname.c_str(),
+				"itemcount", item->mCount
+			);
+		}
+	}
+	return PyDict_New();
+}
 // 获取玩家信息
 api_function(getPlayerInfo) {
 	Player* p;
 	if (PyArg_ParseTuple(args, "K:getPlayerInfo", &p)) {
 		if (PlayerCheck(p)) {
 			Vec3* pp = p->getPos();
-			return Py_BuildValue("{s:s,s:[f,f,f],s:i,s:b,s:f,s:f}",
+			return Py_BuildValue("{s:s,s:s,s:[f,f,f],s:i,s:b,s:i,s:i}",
+				"xuid", p->getXuid().c_str(),
 				"playername", p->getNameTag().c_str(),
 				"XYZ", pp->x, pp->y, pp->z,
 				"dimensionid", p->getDimensionId(),
 				"isstand", p->isStand(),
-				"health", p->getHealth(),
-				"maxhealth", p->getMaxHealth()
+				"health", (int)p->getHealth(),
+				"maxhealth", (int)p->getMaxHealth()
 			);
 		}
 	}
@@ -429,6 +450,7 @@ api_method(sendModalForm),
 api_method(sendCustomForm),
 api_method(transferServer),
 api_method(getSelectedItem),
+api_method(getInventoryItem),
 api_method(getPlayerInfo),
 api_method(getActorInfo),
 api_method(getPlayerPerm),
@@ -835,4 +857,40 @@ int DllMain(VA, int dwReason, VA) {
 		puts("[BDSpyrunner] v0.0.12 for BDS1.16.201 loaded.");
 		puts("[BDSpyrunner] compilation time : " __TIME__ " " __DATE__);
 	} return 1;
+}
+
+
+
+
+using namespace std;
+
+//================================封装函数===================================================================
+// [原型] public: virtual void __cdecl ServerScoreboard::onScoreChanged(struct ScoreboardId const & __ptr64,class Objective const & __ptr64) __ptr64
+// [符号] ?onScoreChanged@ServerScoreboard@@UEAAXAEBUScoreboardId@@AEBVObjective@@@Z
+// 计分板改变时的监听
+//通过计分板名称获取计分板id
+int getScoreBoardId_byString(std::string* str) {
+	_scoreboard->getScoreboardId(str);
+}
+//通过玩家指针获取计分板id
+int getScoreBoardId_byPlayer(Player* player) {
+	_scoreboard->getScoreboardId(player);
+}
+void createScoreBoardId(Player* player) {
+	_scoreboard->createScoreBoardId(player);
+}
+//===================================================将以下设置为监听======================================================================================
+Hook(计分板改变, void, "?onScoreChanged@ServerScoreboard@@UEAAXAEBUScoreboardId@@AEBVObjective@@@Z", const struct Scoreboard* class_this, ScoreboardId* a2, Objective* a3)
+{
+	/*
+	原命令：
+	创建计分板时：/scoreboard objectives <add|remove> <objectivename> dummy <objectivedisplayname>
+	修改计分板时（此函数hook此处)：/scoreboard players <add|remove|set> <playersname> <objectivename> <playersnum>
+	*/
+	int scoreboardid = a2->id;
+	cout << to_string(scoreboardid) << endl;//获取计分板id
+	cout << to_string(a3->getPlayerScore(a2)->getCount()) << endl;//获取修改后的<playersnum>
+	cout << a3->getscorename() << endl;//获取<objectivename>
+	cout << a3->getscoredisplayname() << endl;//获取<objectivedisname>
+	original(class_this, a2, a3);
 }
