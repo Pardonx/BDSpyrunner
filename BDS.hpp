@@ -59,23 +59,23 @@ struct Tag {
 };
 struct IntTag : Tag {
 	int value;
-	IntTag(){}
+	IntTag() {}
 	IntTag(int i) :value(i) {}
 };
 struct StringTag : Tag {
 	string value;
-	StringTag(){}
+	StringTag() {}
 	StringTag(const char* str) :value(str) {}
 };
 struct ListTag : Tag {
 	vector<Tag*> value;
-	ListTag(){}
+	ListTag() {}
 };
 struct CompoundTag : Tag {
 	using CompoundTagVariant = variant<IntTag, StringTag, ListTag, CompoundTag>;
 	map<string, CompoundTagVariant> value;
 
-	CompoundTag(){}
+	CompoundTag() {}
 	string toString() {
 		string s;
 		SYMCALL("?toString@CompoundTag@@UEBA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ",
@@ -408,12 +408,12 @@ struct ScoreboardId {
 struct Objective {
 	//从objective::objective得到
 	//获取计分板名称
-	auto getscorename() {
-		return *(std::string*)((VA)(this) + 64);
+	auto getScoreName() {
+		return f(string,this + 64);
 	}
 	//获取计分板展示名称
-	auto getscoredisplayname() {
-		return *(std::string*)((VA)(this) + 96);
+	auto getScoreDisplayName() {
+		return f(string, this + 96);
 	}
 	auto createScoreboardId(Player* player) {
 		return SYMCALL<ScoreboardId*>("?createScoreboardId@ServerScoreboard@@UEAAAEBUScoreboardId@@AEBVPlayer@@@Z", this, player);
@@ -444,7 +444,7 @@ struct Scoreboard {
 		return SYMCALL<ScoreboardId*>("?getScoreboardId@Scoreboard@@QEBAAEBUScoreboardId@@AEBVActor@@@Z", this, a2);
 	}
 	//更改玩家分数
-	int modifyPlayerScore(ScoreboardId* a3, Objective* a4, int count, char mode) {
+	int modifyPlayerScore(ScoreboardId* a3, Objective* a4, int count, int mode) {
 		bool a2 = true;
 		return SYMCALL<int>("?modifyPlayerScore@Scoreboard@@QEAAHAEA_NAEBUScoreboardId@@AEAVObjective@@HW4PlayerScoreSetFunction@@@Z",
 			this, &a2, a3, a4, count, mode);

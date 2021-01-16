@@ -30,7 +30,7 @@ static bool callpy(const char* type, PyObject* val) {
 	return result;
 }
 static void delay(PyObject* func, PyObject* args, unsigned time) {
-	if(time)
+	if (time)
 		Sleep(time);
 	if (PyCallable_Check(func))
 		PyObject_CallOneArg(func, args);
@@ -74,7 +74,9 @@ static bool CommandRequestPacket(Player* p, string cmd) {
 		VA pkt;//CommandRequestPacket
 		createPacket(&pkt, 77);
 		f(string, pkt + 40) = cmd;
-		p->sendPacket(pkt);
+		VA nid = p->getNetId();
+		SYMCALL<VA>("?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVCommandRequestPacket@@@Z", _ServerNetworkHandle, nid, pkt);
+		//p->sendPacket(pkt);
 		return true;
 	}
 	return false;
@@ -273,8 +275,8 @@ api_function(getPlayerInfo) {
 				"XYZ", pp->x, pp->y, pp->z,
 				"dimensionid", p->getDimensionId(),
 				"isstand", p->isStand(),
-				"health", (int)p->getHealth(),
-				"maxhealth", (int)p->getMaxHealth()
+				"health", p->getHealth(),
+				"maxhealth", p->getMaxHealth()
 			);
 		}
 	}
@@ -355,7 +357,7 @@ api_function(getPlayerScore) {
 	return _PyLong_Zero;
 }
 api_function(modifyPlayerScore) {
-	Player* p; const char* obj; int count; char mode;
+	Player* p; const char* obj; int count; int mode;
 	if (PyArg_ParseTuple(args, "Ksii:modifyPlayerScore", &p, &obj, &count, &mode)) {
 		if (PlayerCheck(p)) {
 			Objective* testobj = _scoreboard->getObjective(obj);
@@ -406,18 +408,6 @@ api_function(tellraw) {
 	}
 	return Py_False;
 }
-// 增加物品
-api_function(addItem) {
-	Player* p; short id, aux; char count;
-	if (PyArg_ParseTuple(args, "Khhb:addItem", &p, &id, &aux, &count)) {
-		if (PlayerCheck(p)) {
-			ItemStack item;
-			item.getFromId(id, aux, count);
-			p->addItem(&item);
-		}
-	}
-	return Py_None;
-}
 // boss栏
 api_function(setBossBar) {
 	Player* p; const char* name; float per;
@@ -432,6 +422,28 @@ api_function(removeBossBar) {
 	if (PyArg_ParseTuple(args, "K:removeBossBar", &p)) {
 		if (BossEventPacket(p, "", 0.0, 2))
 			return Py_True;
+	}
+	return Py_False;
+}
+//通过玩家指针获取计分板id
+api_function(getScoreBoardId) {
+	Player* p;
+	if (PyArg_ParseTuple(args, "K:getScoreBoardId", &p)) {
+		if (PlayerCheck(p)) {
+			return Py_BuildValue("{s:i}",
+				"scoreboardid", _scoreboard->getScoreboardId(p)
+			);
+		}
+	}
+	return Py_False;
+}
+api_function(createScoreBoardId) {
+	Player* p;
+	if (PyArg_ParseTuple(args, "K:createScoreBoardId", &p)) {
+		if (PlayerCheck(p)) {
+			_scoreboard->createScoreBoardId(p);
+			return Py_True;
+		}
 	}
 	return Py_False;
 }
@@ -463,9 +475,10 @@ api_method(talkAs),
 api_method(runcmdAs),
 api_method(teleport),
 api_method(tellraw),
-api_method(addItem),
 api_method(setBossBar),
 api_method(removeBossBar),
+api_method(getScoreBoardId),
+api_method(createScoreBoardId),
 {}
 };
 // 模块声明
@@ -490,7 +503,7 @@ Hook(获取游戏初始化信息, VA, "??0GameSession@@QEAA@AEAVNetworkHandler@@V?$unique
 	_ServerNetworkHandle = f(VA, a3);
 	return original(a1, a2, a3, a4, a5, a6, a7);
 }
-Hook(命令注册, void, "?setup@KillCommand@@SAXAEAVCommandRegistry@@@Z",//"?setup@ChangeSettingCommand@@SAXAEAVCommandRegistry@@@Z",
+Hook(命令注册, void, "?setup@ChangeSettingCommand@@SAXAEAVCommandRegistry@@@Z",//"?setup@ChangeSettingCommand@@SAXAEAVCommandRegistry@@@Z",?setup@KillCommand@@SAXAEAVCommandRegistry@@@Z
 	VA _this) {
 	for (auto& cmd : Command) {
 		SYMCALL("?registerCommand@CommandRegistry@@QEAAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PEBDW4CommandPermissionLevel@@UCommandFlag@@3@Z",
@@ -513,12 +526,13 @@ Hook(后台输出, VA, "??$_Insert_string@DU?$char_traits@D@std@@_K@std@@YAAEAV?$bas
 }
 Hook(后台输入, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@AEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
 	VA _this, string* cmd) {
+	/*弃用
 	if (*cmd == "pyreload") {
 		Py_Finalize();
 		PyFuncs.clear();
 		init();
 		return false;
-	}
+	}*/
 	bool res = callpy(u8"后台输入", PyUnicode_FromString((*cmd).c_str()));
 	check_ret(_this, cmd);
 }
@@ -537,10 +551,9 @@ Hook(离开游戏, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer
 Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EAEBVVec3@@PEBVBlock@@@Z",
 	VA _this, ItemStack* item, BlockPos* bp, unsigned __int8 a4, VA v5, Block* b) {
 	Player* p = f(Player*, _this + 8);
-
-	auto tag = item->save();
+	//auto tag = item->save();
 	//tag->value["Name"] = "ss";
-	p->getContainer()->getSlots()[8]->fromTag(tag);
+	//p->getContainer()->getSlots()[8]->fromTag(tag);
 	//p->updateInventory();
 	//p->addItem(item);
 	//auto name = tag->getList("ench");
@@ -552,7 +565,8 @@ Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EA
 	BlockLegacy* bl = b->getBlockLegacy();
 	short bid = bl->getBlockItemID();
 	string bn = bl->getBlockName();
-	bool res = callpy(u8"使用物品", Py_BuildValue("{s:K,s:i,s:i,s:s,s:s,s:i,s:[i,i,i]}",
+	bool res = true;
+	res = callpy(u8"使用物品", Py_BuildValue("{s:K,s:i,s:i,s:s,s:s,s:i,s:[i,i,i]}",
 		"player", p,
 		"itemid", iid,
 		"itemaux", iaux,
@@ -565,19 +579,19 @@ Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EA
 }
 Hook(放置方块, bool, "?mayPlace@BlockSource@@QEAA_NAEBVBlock@@AEBVBlockPos@@EPEAVActor@@_N@Z",
 	BlockSource* _this, Block* b, BlockPos* bp, unsigned __int8 a4, Actor* p, bool _bool) {
+	bool res = true;
 	if (p && PlayerCheck(p)) {
 		BlockLegacy* bl = b->getBlockLegacy();
 		short bid = bl->getBlockItemID();
 		string bn = bl->getBlockName();
-		bool res = callpy(u8"放置方块", Py_BuildValue("{s:K,s:s,s:i,s:[i,i,i]}",
+		res = callpy(u8"放置方块", Py_BuildValue("{s:K,s:s,s:i,s:[i,i,i]}",
 			"player", p,
 			"blockname", bn.c_str(),
 			"blockid", bid,
 			"position", bp->x, bp->y, bp->z
 		));
-		check_ret(_this, b, bp, a4, p, _bool);
 	}
-	return original(_this, b, bp, a4, p, _bool);
+	check_ret(_this, b, bp, a4, p, _bool);
 }
 Hook(破坏方块, bool, "?_destroyBlockInternal@GameMode@@AEAA_NAEBVBlockPos@@E@Z",
 	VA _this, BlockPos* bp) {
@@ -587,7 +601,8 @@ Hook(破坏方块, bool, "?_destroyBlockInternal@GameMode@@AEAA_NAEBVBlockPos@@E@Z",
 	BlockLegacy* bl = b->getBlockLegacy();
 	short bid = bl->getBlockItemID();
 	string bn = bl->getBlockName();
-	bool res = callpy(u8"破坏方块", Py_BuildValue("{s:K,s:s,s:i,s:[i,i,i]}",
+	bool res = true;
+	res = callpy(u8"破坏方块", Py_BuildValue("{s:K,s:s,s:i,s:[i,i,i]}",
 		"player", p,
 		"blockname", bn.c_str(),
 		"blockid", bid,
@@ -745,15 +760,15 @@ Hook(选择表单, void, "?handle@?$PacketHandlerDispatcherInstance@VModalFormRespon
 	if (PlayerCheck(p)) {
 		unsigned fid = f(unsigned, fmp + 40);
 		string data = f(string, fmp + 48);
-		if (data != "null\n") {
-			//VA len = data.length() - 1;
-			//if (data[len] == '\n')data[len] = '\0';
-			callpy(u8"选择表单", Py_BuildValue("{s:K,s:s,s:i}",
-				"player", p,
-				"selected", data.c_str(),
-				"formid", fid
-			));
-		}
+
+		//VA len = data.length() - 1;
+		//if (data[len] == '\n')data[len] = '\0';
+		callpy(u8"选择表单", Py_BuildValue("{s:K,s:s,s:i}",
+			"player", p,
+			"selected", data.c_str(),
+			"formid", fid
+		));
+
 	}
 	original(_this, id, handle, fp);
 }
@@ -816,7 +831,7 @@ Hook(命令方块执行, bool, "?performCommand@CommandBlockActor@@QEAA_NAEAVBlockSour
 }
 Hook(玩家穿戴, void, "?setArmor@Player@@UEAAXW4ArmorSlot@@AEBVItemStack@@@Z",
 	Player* p, unsigned slot, ItemStack* i) {
-	if (!i->getId())return;
+	if (!i->getId())return original(p, slot, i);
 	bool res = callpy(u8"玩家穿戴", Py_BuildValue("{s:K,s:i,s:i,s:s,s:i,s:i}",
 		"player", p,
 		"itemid", i->getId(),
@@ -826,6 +841,40 @@ Hook(玩家穿戴, void, "?setArmor@Player@@UEAAXW4ArmorSlot@@AEBVItemStack@@@Z",
 		"slot", slot
 	));
 	if (res)original(p, slot, i);
+}
+Hook(计分板改变, void, "?onScoreChanged@ServerScoreboard@@UEAAXAEBUScoreboardId@@AEBVObjective@@@Z",
+	const Scoreboard* _this, ScoreboardId* a2, Objective* a3) {
+	/*
+	原命令：
+	创建计分板时：/scoreboard objectives <add|remove> <objectivename> dummy <objectivedisplayname>
+	修改计分板时（此函数hook此处)：/scoreboard players <add|remove|set> <playersname> <objectivename> <playersnum>
+	*/
+	int scoreboardid = a2->id;
+	callpy(u8"计分板改变", Py_BuildValue("{s:i,s:i,s:s,s:s}",
+		"scoreboardid", scoreboardid,
+		"playersnum", a3->getPlayerScore(a2)->getCount(),
+		"objectivename", a3->getScoreName().c_str(),
+		"objectivedisname", a3->getScoreDisplayName().c_str()
+	));
+	/*
+	cout << to_string(scoreboardid) << endl;//获取计分板id
+	cout << to_string(a3->getPlayerScore(a2)->getCount()) << endl;//获取修改后的<playersnum>
+	cout << a3->getscorename() << endl;//获取<objectivename>
+	cout << a3->getscoredisplayname() << endl;//获取<objectivedisname>
+	*/
+	original(_this, a2, a3);
+}
+Hook(耕地破坏, void, "?transformOnFall@FarmBlock@@UEBAXAEAVBlockSource@@AEBVBlockPos@@PEAVActor@@M@Z",
+	VA _this, BlockSource* a1, BlockPos* a2, Player* p, VA a4) {
+	bool res = true;
+	if (PlayerCheck(p)) {
+		res = callpy(u8"耕地破坏", Py_BuildValue("{s:K,s:[i,i,i],s:i}",
+			"player", p,
+			"position", a2->x, a2->y, a2->z,
+			"dimensionid", a1->getDimensionId()
+		));
+	}
+	if (res)original(_this, a1, a2, p, a4);
 }
 #pragma endregion
 void init() {
@@ -841,7 +890,6 @@ void init() {
 			printf("[BDSpyrunner] reading %s.\n", Info.name);
 			PyRun_SimpleFileExFlags(file, Info.name, 1, 0);
 		} while (!_findnext(handle, &Info));
-
 		_findclose(handle);
 	}
 	else puts("[BDSpyrunner] can't find py directory.");
@@ -854,43 +902,7 @@ int DllMain(VA, int dwReason, VA) {
 		Py_PreInitialize(&cfg);
 		PyImport_AppendInittab("mc", mc_init); //增加一个模块
 		init();
-		puts("[BDSpyrunner] v0.0.12 for BDS1.16.201 loaded.");
+		puts("[BDSpyrunner] v0.1.0 for BDS1.16.201 loaded.");
 		puts("[BDSpyrunner] compilation time : " __TIME__ " " __DATE__);
 	} return 1;
-}
-
-
-
-
-using namespace std;
-
-//================================封装函数===================================================================
-// [原型] public: virtual void __cdecl ServerScoreboard::onScoreChanged(struct ScoreboardId const & __ptr64,class Objective const & __ptr64) __ptr64
-// [符号] ?onScoreChanged@ServerScoreboard@@UEAAXAEBUScoreboardId@@AEBVObjective@@@Z
-// 计分板改变时的监听
-//通过计分板名称获取计分板id
-int getScoreBoardId_byString(std::string* str) {
-	_scoreboard->getScoreboardId(str);
-}
-//通过玩家指针获取计分板id
-int getScoreBoardId_byPlayer(Player* player) {
-	_scoreboard->getScoreboardId(player);
-}
-void createScoreBoardId(Player* player) {
-	_scoreboard->createScoreBoardId(player);
-}
-//===================================================将以下设置为监听======================================================================================
-Hook(计分板改变, void, "?onScoreChanged@ServerScoreboard@@UEAAXAEBUScoreboardId@@AEBVObjective@@@Z", const struct Scoreboard* class_this, ScoreboardId* a2, Objective* a3)
-{
-	/*
-	原命令：
-	创建计分板时：/scoreboard objectives <add|remove> <objectivename> dummy <objectivedisplayname>
-	修改计分板时（此函数hook此处)：/scoreboard players <add|remove|set> <playersname> <objectivename> <playersnum>
-	*/
-	int scoreboardid = a2->id;
-	cout << to_string(scoreboardid) << endl;//获取计分板id
-	cout << to_string(a3->getPlayerScore(a2)->getCount()) << endl;//获取修改后的<playersnum>
-	cout << a3->getscorename() << endl;//获取<objectivename>
-	cout << a3->getscoredisplayname() << endl;//获取<objectivedisname>
-	original(class_this, a2, a3);
 }
