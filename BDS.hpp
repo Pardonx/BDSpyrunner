@@ -1,6 +1,7 @@
 #pragma once
 #include "pch.h"
 #include "string_span.h"
+#include "TAG.hpp"
 using namespace std;
 struct BlockLegacy {
 	string getBlockName() {
@@ -43,70 +44,6 @@ struct Level {};
 struct Vec3 { float x = 0.0f, y = 0.0f, z = 0.0f; };
 struct Vec2 { float x = 0.0f, y = 0.0f; };
 struct MobEffectInstance { char fill[0x1C]; };
-
-struct Tag {
-	enum Type {
-		End, Byte, Short, Int, Int64, Float,
-		Double, ByteArray, String, List, Compound,
-	};
-	//占位虚函数表
-	virtual void fill() {}
-	//构建新Tag
-	Tag* newTag(Type t) {
-		return SYMCALL<Tag*>("?newTag@Tag@@SA?AV?$unique_ptr@VTag@@U?$default_delete@VTag@@@std@@@std@@W4Type@1@@Z",
-			this, t);
-	}
-};
-struct IntTag : Tag {
-	int value;
-	IntTag() {}
-	IntTag(int i) :value(i) {}
-};
-struct StringTag : Tag {
-	string value;
-	StringTag() {}
-	StringTag(const char* str) :value(str) {}
-};
-struct ListTag : Tag {
-	vector<Tag*> value;
-	ListTag() {}
-};
-struct CompoundTag : Tag {
-	using CompoundTagVariant = variant<IntTag, StringTag, ListTag, CompoundTag>;
-	map<string, CompoundTagVariant> value;
-
-	CompoundTag() {}
-	string toString() {
-		string s;
-		SYMCALL("?toString@CompoundTag@@UEBA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ",
-			this, &s);
-		return s;
-	}
-	bool Has(gsl::cstring_span<> s) {
-		return SYMCALL<bool>("?contains@CompoundTag@@QEBA_NV?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	unsigned char getByte(gsl::cstring_span<> s) {
-		return SYMCALL<unsigned char>("?getByte@CompoundTag@@QEBAEV?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	int getInt(gsl::cstring_span<> s) {
-		return SYMCALL<int>("?getInt@CompoundTag@@QEBAHV?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	string getString(gsl::cstring_span<> s) {
-		return *SYMCALL<string*>("?getString@CompoundTag@@QEBAAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	ListTag* getList(gsl::cstring_span<> s) {
-		return SYMCALL<ListTag*>("?getList@CompoundTag@@QEAAPEAVListTag@@V?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	CompoundTag* getCompound(gsl::cstring_span<> s) {
-		return SYMCALL<CompoundTag*>("?getCompound@CompoundTag@@QEAAPEAV1@V?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-};
 
 struct EnchantmentInstance {
 	int type;
@@ -160,8 +97,8 @@ struct ItemStackBase {
 	bool isNull() {
 		return SYMCALL<bool>("?isNull@ItemStackBase@@QEBA_NXZ", this);
 	}
-	CompoundTag* getNetworkUserData() {
-		CompoundTag* ct;
+	Tag* getNetworkUserData() {
+		Tag* ct;
 		SYMCALL("?getNetworkUserData@ItemStackBase@@QEBA?AV?$unique_ptr@VCompoundTag@@U?$default_delete@VCompoundTag@@@std@@@std@@XZ",
 			this, &ct);
 		return ct;
@@ -175,10 +112,10 @@ struct ItemStackBase {
 	bool isEmptyStack() {
 		return f(char, this + 34) == 0;
 	}
-	ItemStackBase* _loadItem(CompoundTag* t) {
-		return SYMCALL<ItemStackBase*>("?_loadItem@ItemStackBase@@AEAAXAEBVCompoundTag@@@Z ", this, t);
+	ItemStackBase* operator=(ItemStackBase* i) {
+		return SYMCALL<ItemStackBase*>("??4ItemStack@@QEAAAEAV0@AEBV0@@Z", this, i);
 	}
-	ItemStackBase* fromTag(CompoundTag* t) {
+	ItemStackBase* fromTag(Tag* t) {
 		return SYMCALL<ItemStackBase*>("?fromTag@ItemStack@@SA?AV1@AEBVCompoundTag@@@Z",
 			this, t);
 	}
@@ -230,7 +167,7 @@ struct Actor {
 	}
 	// 获取实体类型
 	unsigned getEntityTypeId() {
-		return f(unsigned, this + 948);
+		return f(unsigned, this + 964);
 	}
 	// 获取查询用ID
 	VA getUniqueID() {
@@ -339,11 +276,8 @@ struct Player : Mob {
 		return SYMCALL<VA>("?setOffhandSlot@Player@@UEAAXAEBVItemStack@@@Z", this, item);
 	}
 	// 添加一个物品
-	void addItem(ItemStack* item) {
-		(*(__int64(__fastcall**)(VA, struct ItemStack*))(*f(VA*, f(VA, this + 366) + 176) + 256))(
-			f(VA, f(VA, this + 366) + 176),
-			item);
-		//SYMCALL<VA>("?add@Player@@UEAA_NAEAVItemStack@@@Z", this, item);
+	void addItem(ItemStackBase* item) {
+		SYMCALL<VA>("?addItem@@YAXAEAVPlayer@@AEAVItemStack@@@Z", this, item);
 	}
 	// 获取当前选中的框位置
 	int getSelectdItemSlot() {// IDA Player::getSelectedItem 12
@@ -377,8 +311,11 @@ struct Player : Mob {
 	}
 	// 更新所有物品列表
 	void updateInventory() {
-		SYMCALL<VA>("?forceBalanceTransaction@InventoryTransactionManager@@QEAAXXZ",
-			this + 4592);// IDA Player::drop 65
+		SYMCALL<VA>("?updateInventoryTransactions@Player@@QEAAXXZ",
+			this);
+
+		//SYMCALL<VA>("?forceBalanceTransaction@InventoryTransactionManager@@QEAAXXZ",
+			//*this + 4592);// IDA Player::drop 65
 	}
 	//传送
 	void teleport(Vec3 target, int dim) {
@@ -401,7 +338,6 @@ struct ScoreInfo {
 		return f(int, this + 12);
 	}
 };
-
 struct ScoreboardId {
 	int id;
 };
@@ -409,7 +345,7 @@ struct Objective {
 	//从objective::objective得到
 	//获取计分板名称
 	auto getScoreName() {
-		return f(string,this + 64);
+		return f(string, this + 64);
 	}
 	//获取计分板展示名称
 	auto getScoreDisplayName() {

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "BDS.hpp"
+#include "TAG.hpp"
 #pragma warning(disable:4996)
 #pragma region 宏定义
 #define api_method(name) {#name, api_##name, 1, 0}
@@ -19,7 +20,17 @@ static unordered_map<string, string> Command;//注册命令
 static unordered_map<string, PyObject*> ShareData;//注册命令
 #pragma endregion
 #pragma region 函数定义
-void init();
+static Json::Value toJson(const string& s) {
+	Json::Value jv;
+	Json::CharReaderBuilder r;
+	JSONCPP_STRING errs;
+	std::unique_ptr<Json::CharReader> const jsonReader(r.newCharReader());
+	bool res = jsonReader->parse(s.c_str(), s.c_str() + s.length(), &jv, &errs);
+	if (!res || !errs.empty()) {
+		cout << (u8"JSON转换失败。。" + errs) << endl;
+	}
+	return jv;
+}
 static bool callpy(const char* type, PyObject* val) {
 	bool result = true;
 	for (PyObject* fn : PyFuncs[type]) {
@@ -225,44 +236,6 @@ api_function(transferServer) {
 	}
 	return Py_False;
 }
-// 获取玩家手持
-api_function(getSelectedItem) {
-	Player* p;
-	if (PyArg_ParseTuple(args, "K:getSelectedItem", &p)) {
-		if (PlayerCheck(p)) {
-			ItemStack* item = p->getSelectedItem();
-			short iaux = item->mAuxValue;
-			short iid = item->getId();
-			string iname = item->getName();
-			return Py_BuildValue("{s:i,s:i,s:s,s:i}",
-				"itemid", iid,
-				"itemaux", iaux,
-				"itemname", iname.c_str(),
-				"itemcount", item->mCount
-			);
-		}
-	}
-	return PyDict_New();
-}
-// 获取玩家背包物品
-api_function(getInventoryItem) {
-	Player* p; int slot;
-	if (PyArg_ParseTuple(args, "Ki:getInventoryItem", &p, &slot)) {
-		if (PlayerCheck(p)) {
-			ItemStack* item = p->getInventoryItem(slot);
-			short iaux = item->mAuxValue;
-			short iid = item->getId();
-			string iname = item->getName();
-			return Py_BuildValue("{s:i,s:i,s:s,s:i}",
-				"itemid", iid,
-				"itemaux", iaux,
-				"itemname", iname.c_str(),
-				"itemcount", item->mCount
-			);
-		}
-	}
-	return PyDict_New();
-}
 // 获取玩家信息
 api_function(getPlayerInfo) {
 	Player* p;
@@ -287,8 +260,8 @@ api_function(getActorInfo) {
 	if (PyArg_ParseTuple(args, "K:getActorInfo", &a)) {
 		assert(a);
 		Vec3* pp = a->getPos();
-		return Py_BuildValue("{s:s,s:[f,f,f],s:i,s:b,s:f,s:f}",
-			"actorname", a->getNameTag().c_str(),
+		return Py_BuildValue("{s:s,s:[f,f,f],s:i,s:b,s:i,s:i}",
+			"entityname", a->getEntityTypeName().c_str(),
 			"XYZ", pp->x, pp->y, pp->z,
 			"dimensionid", a->getDimensionId(),
 			"isstand", a->isStand(),
@@ -447,6 +420,78 @@ api_function(createScoreBoardId) {
 	}
 	return Py_False;
 }
+//修改生物受伤的伤害值!
+int _Damage;
+api_function(setDamage) {
+	int a;
+	if (PyArg_ParseTuple(args, "i:setDamage", &a)) {
+		_Damage = a;
+		return Py_True;
+	}
+	return Py_False;
+}
+api_function(setServerMotd) {
+	const char* n;
+	if (PyArg_ParseTuple(args, "s:setServerMotd", &n)) {
+		string name = n;
+		SYMCALL("?allowIncomingConnections@ServerNetworkHandler@@QEAAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z",
+			_ServerNetworkHandle, &n, 1);
+		return Py_True;
+	}
+	return Py_False;
+}
+// 增加一个物品
+api_function(addItemEx) {
+	Player* p;
+	const char* x;
+	if (PyArg_ParseTuple(args, "Ks:addItemEx", &p, &x)) {
+		if (PlayerCheck(p)) {
+			Tag* t = JsontoTag(toJson(x));
+			ItemStack i;
+			i.fromTag(t);
+			p->addItem(&i);
+			p->updateInventory();
+			t->deCompound();
+			return Py_True;
+		}
+	}
+	return Py_False;
+}
+api_function(getPlayerItems) {
+	Player* p;
+	if (PyArg_ParseTuple(args, "Ks:getPlayerItems", &p)) {
+		if (PlayerCheck(p)) {
+			Json::Value j;
+			for (auto& i : p->getContainer()->getSlots()) {
+				j.append(i->save()->toJson());
+			}
+			return PyUnicode_FromString(j.toStyledString().c_str());
+		}
+	}
+	return Py_False;
+}
+// 获取玩家手持
+api_function(getSelectedItem) {
+	Player* p;
+	if (PyArg_ParseTuple(args, "K:getSelectedItem", &p)) {
+		if (PlayerCheck(p)) {
+			ItemStack* item = p->getSelectedItem();
+			return PyUnicode_FromString(item->save()->toJson().toStyledString().c_str());
+		}
+	}
+	return Py_False;
+}
+// 获取玩家背包物品
+api_function(getInventoryItem) {
+	Player* p; int slot;
+	if (PyArg_ParseTuple(args, "Ki:getInventoryItem", &p, &slot)) {
+		if (PlayerCheck(p)) {
+			ItemStack* item = p->getInventoryItem(slot);
+			return PyUnicode_FromString(item->save()->toJson().toStyledString().c_str());
+		}
+	}
+	return Py_False;
+}
 // 方法列表
 PyMethodDef api_list[] = {
 api_method(logout),
@@ -461,8 +506,6 @@ api_method(sendSimpleForm),
 api_method(sendModalForm),
 api_method(sendCustomForm),
 api_method(transferServer),
-api_method(getSelectedItem),
-api_method(getInventoryItem),
 api_method(getPlayerInfo),
 api_method(getActorInfo),
 api_method(getPlayerPerm),
@@ -479,6 +522,12 @@ api_method(setBossBar),
 api_method(removeBossBar),
 api_method(getScoreBoardId),
 api_method(createScoreBoardId),
+api_method(setDamage),
+api_method(setServerMotd),
+api_method(addItemEx),
+api_method(getPlayerItems),
+api_method(getSelectedItem),
+api_method(getInventoryItem),
 {}
 };
 // 模块声明
@@ -507,7 +556,7 @@ Hook(命令注册, void, "?setup@ChangeSettingCommand@@SAXAEAVCommandRegistry@@@Z",/
 	VA _this) {
 	for (auto& cmd : Command) {
 		SYMCALL("?registerCommand@CommandRegistry@@QEAAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PEBDW4CommandPermissionLevel@@UCommandFlag@@3@Z",
-			_this, cmd.first.c_str(), cmd.second.c_str(), 0, 0, 0);
+			_this, cmd.first.c_str(), cmd.second.c_str(), 0, 0, 0x40);
 	}
 	original(_this);
 }
@@ -526,13 +575,6 @@ Hook(后台输出, VA, "??$_Insert_string@DU?$char_traits@D@std@@_K@std@@YAAEAV?$bas
 }
 Hook(后台输入, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@AEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
 	VA _this, string* cmd) {
-	/*弃用
-	if (*cmd == "pyreload") {
-		Py_Finalize();
-		PyFuncs.clear();
-		init();
-		return false;
-	}*/
 	bool res = callpy(u8"后台输入", PyUnicode_FromString((*cmd).c_str()));
 	check_ret(_this, cmd);
 }
@@ -551,14 +593,24 @@ Hook(离开游戏, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer
 Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EAEBVVec3@@PEBVBlock@@@Z",
 	VA _this, ItemStack* item, BlockPos* bp, unsigned __int8 a4, VA v5, Block* b) {
 	Player* p = f(Player*, _this + 8);
-	//auto tag = item->save();
+
+	CompoundTag* tag = item->save();
+	cout << tag->toJson().toStyledString() << endl;
+	ItemStack i;
+	CompoundTag* cc = (CompoundTag*)(JsontoTag(tag->toJson()));
+	cout << cc->toJson().toStyledString() << endl;
+	i.fromTag(JsontoTag(tag->toJson()));
+	p->addItem(&i);
+	tag->deCompound();
+
+	//p->getContainer()->addItemToFirstEmptySlot(i);
+	//delete cc;
+	//delete bb;
+	//delete cc;
+	//tag = item->save()->getCompound("tag")->getList("ench")->getCompound(0)->getShort("id");
+	//cout << to_string(tag) << endl;
 	//tag->value["Name"] = "ss";
-	//p->getContainer()->getSlots()[8]->fromTag(tag);
-	//p->updateInventory();
-	//p->addItem(item);
-	//auto name = tag->getList("ench");
-	//auto l = tag->getByte("Count");
-	//TextPacket(p, 0, name);
+	p->updateInventory();
 	short iid = item->getId();
 	short iaux = item->mAuxValue;
 	string iname = item->getName();
@@ -700,6 +752,7 @@ Hook(生物死亡, void, "?die@Mob@@UEAAXAEBVActorDamageSource@@@Z",
 }
 Hook(生物受伤, bool, "?_hurt@Mob@@MEAA_NAEBVActorDamageSource@@H_N1@Z",
 	Mob* _this, VA dmsg, int a3, bool a4, bool a5) {
+	_Damage = a3;//将生物受伤的值设置为可调整
 	char v72;
 	Actor* sa = SYMCALL<Actor*>("?fetchEntity@Level@@QEBAPEAVActor@@UActorUniqueID@@_N@Z",
 		f(VA, _this + 856), *(VA*)((*(VA(__fastcall**)(VA, char*))(*(VA*)dmsg + 64))(dmsg, &v72)), 0);
@@ -709,7 +762,7 @@ Hook(生物受伤, bool, "?_hurt@Mob@@MEAA_NAEBVActorDamageSource@@H_N1@Z",
 		"actor2", sa,//可能为0
 		"damage", a3
 	));
-	check_ret(_this, dmsg, a3, a4, a5);
+	check_ret(_this, dmsg, _Damage, a4, a5);
 }
 Hook(玩家重生, void, "?respawn@Player@@UEAAXXZ",
 	Player* p) {
@@ -896,13 +949,14 @@ void init() {
 }
 int DllMain(VA, int dwReason, VA) {
 	if (dwReason == 1) {
-		puts("[BDSpyrunner] loading...");
+		//fstream of("bag.json");
+		//string str((std::istreambuf_iterator<char>(of)), std::istreambuf_iterator<char>());
+		//of.close();
 		PyPreConfig cfg;
 		PyPreConfig_InitIsolatedConfig(&cfg);
 		Py_PreInitialize(&cfg);
 		PyImport_AppendInittab("mc", mc_init); //增加一个模块
 		init();
-		puts("[BDSpyrunner] v0.1.0 for BDS1.16.201 loaded.");
-		puts("[BDSpyrunner] compilation time : " __TIME__ " " __DATE__);
+		puts("[BDSpyrunner] v0.1.2 for BDS1.16.201 loaded.");
 	} return 1;
 }

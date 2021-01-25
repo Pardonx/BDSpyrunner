@@ -7,11 +7,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="python39.lib" />
     <Library Include="chakra.lib" />
+    <Library Include="python39.lib" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="mod.cpp" />
+    <ClCompile Include="jsoncpp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
