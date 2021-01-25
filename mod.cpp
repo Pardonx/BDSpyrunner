@@ -459,7 +459,7 @@ api_function(addItemEx) {
 }
 api_function(getPlayerItems) {
 	Player* p;
-	if (PyArg_ParseTuple(args, "Ks:getPlayerItems", &p)) {
+	if (PyArg_ParseTuple(args, "K:getPlayerItems", &p)) {
 		if (PlayerCheck(p)) {
 			Json::Value j;
 			for (auto& i : p->getContainer()->getSlots()) {
@@ -471,9 +471,9 @@ api_function(getPlayerItems) {
 	return Py_False;
 }
 // 获取玩家手持
-api_function(getSelectedItem) {
+api_function(getPlayerHand) {
 	Player* p;
-	if (PyArg_ParseTuple(args, "K:getSelectedItem", &p)) {
+	if (PyArg_ParseTuple(args, "K:getPlayerHand", &p)) {
 		if (PlayerCheck(p)) {
 			ItemStack* item = p->getSelectedItem();
 			return PyUnicode_FromString(item->save()->toJson().toStyledString().c_str());
@@ -482,9 +482,9 @@ api_function(getSelectedItem) {
 	return Py_False;
 }
 // 获取玩家背包物品
-api_function(getInventoryItem) {
+api_function(getPlayerItem) {
 	Player* p; int slot;
-	if (PyArg_ParseTuple(args, "Ki:getInventoryItem", &p, &slot)) {
+	if (PyArg_ParseTuple(args, "Ki:getPlayerItem", &p, &slot)) {
 		if (PlayerCheck(p)) {
 			ItemStack* item = p->getInventoryItem(slot);
 			return PyUnicode_FromString(item->save()->toJson().toStyledString().c_str());
@@ -526,8 +526,8 @@ api_method(setDamage),
 api_method(setServerMotd),
 api_method(addItemEx),
 api_method(getPlayerItems),
-api_method(getSelectedItem),
-api_method(getInventoryItem),
+api_method(getPlayerHand),
+api_method(getPlayerItem),
 {}
 };
 // 模块声明
@@ -593,24 +593,6 @@ Hook(离开游戏, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer
 Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EAEBVVec3@@PEBVBlock@@@Z",
 	VA _this, ItemStack* item, BlockPos* bp, unsigned __int8 a4, VA v5, Block* b) {
 	Player* p = f(Player*, _this + 8);
-
-	CompoundTag* tag = item->save();
-	cout << tag->toJson().toStyledString() << endl;
-	ItemStack i;
-	CompoundTag* cc = (CompoundTag*)(JsontoTag(tag->toJson()));
-	cout << cc->toJson().toStyledString() << endl;
-	i.fromTag(JsontoTag(tag->toJson()));
-	p->addItem(&i);
-	tag->deCompound();
-
-	//p->getContainer()->addItemToFirstEmptySlot(i);
-	//delete cc;
-	//delete bb;
-	//delete cc;
-	//tag = item->save()->getCompound("tag")->getList("ench")->getCompound(0)->getShort("id");
-	//cout << to_string(tag) << endl;
-	//tag->value["Name"] = "ss";
-	p->updateInventory();
 	short iid = item->getId();
 	short iaux = item->mAuxValue;
 	string iname = item->getName();
@@ -909,12 +891,6 @@ Hook(计分板改变, void, "?onScoreChanged@ServerScoreboard@@UEAAXAEBUScoreboardId@
 		"objectivename", a3->getScoreName().c_str(),
 		"objectivedisname", a3->getScoreDisplayName().c_str()
 	));
-	/*
-	cout << to_string(scoreboardid) << endl;//获取计分板id
-	cout << to_string(a3->getPlayerScore(a2)->getCount()) << endl;//获取修改后的<playersnum>
-	cout << a3->getscorename() << endl;//获取<objectivename>
-	cout << a3->getscoredisplayname() << endl;//获取<objectivedisname>
-	*/
 	original(_this, a2, a3);
 }
 Hook(耕地破坏, void, "?transformOnFall@FarmBlock@@UEBAXAEAVBlockSource@@AEBVBlockPos@@PEAVActor@@M@Z",
@@ -928,6 +904,18 @@ Hook(耕地破坏, void, "?transformOnFall@FarmBlock@@UEBAXAEAVBlockSource@@AEBVBloc
 		));
 	}
 	if (res)original(_this, a1, a2, p, a4);
+}
+Hook(使用重生锚, bool, "?trySetSpawn@RespawnAnchorBlock@@CA_NAEAVPlayer@@AEBVBlockPos@@AEAVBlockSource@@AEAVLevel@@@Z",
+	Player* p, BlockPos* a2, BlockSource* a3, void* a4) {
+	bool res = true;
+	if (PlayerCheck(p)) {
+		res = callpy(u8"使用重生锚", Py_BuildValue("{s:K,s:[i,i,i],s:i}",
+			"player", p,
+			"position", a2->x, a2->y, a2->z,
+			"dimensionid", a3->getDimensionId()
+		));
+	}
+	check_ret(p, a2, a3, a4);
 }
 #pragma endregion
 void init() {
