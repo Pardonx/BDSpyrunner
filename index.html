@@ -256,7 +256,7 @@
 
   [例] tellraw(player,<span class="string">'pyr!'</span>)
 
-  <p>setPlayerBossBar</p>
+  <p>setBossBar</p>
   <span class="comment">
    功能：设置玩家自定义血条<br/>
    参数类型：整数 字符串 浮点数<br/>
@@ -264,9 +264,9 @@
    返回值：是否设置成功<br/>
   </span>
 
-  [例] setPlayerBossBar(player,<span class="string">'标题'</span>, 1.00)
+  [例] setBossBar(player,<span class="string">'标题'</span>, 1.00)
 
-  <p>removePlayerBossBar</p>
+  <p>removeBossBar</p>
   <span class="comment">
    功能：清除玩家自定义血条<br/>
    参数类型：整数<br/>
@@ -274,7 +274,7 @@
    返回值：是否清除成功<br/>
   </span>
 
-  [例] removePlayerBossBar(player)
+  [例] removeBossBar(player)
 
   <p>setServerMotd</p>
   <span class="comment">
@@ -297,16 +297,6 @@
 
   [例] addItemEx(player,<span class="string">'{"Block.10" :{"name.8" : "minecraft:undyed_shulker_box","states.10" : {},"version.3" : 17825808},"Count.1" : 1,"Damage.2" : 0,"Name.8" : "minecraft:undyed_shulker_box","WasPickedUp.1" : 0,"tag.10" :{"Items.9" :[{"Count.1" : 1,"Damage.2" : 0,"Name.8" : "minecraft:enchanted_book","Slot.1" : 0,"WasPickedUp.1" : 0,"tag.10" :{"ench.9" :[{"id.2" : 4,"lvl.2" : 1}]}},{"Count.1" : 1,"Damage.2" : 0,"Name.8" : "minecraft:netherite_sword","Slot.1" : 1,"WasPickedUp.1" : 0,"tag.10" :{"RepairCost.3" : 3,"display.10" :{"Name.8" : "\u4e0b\u754c\u5408\u91d1\u5251"},"ench.9" :[{"id.2" : 17,"lvl.2" : 3},{"id.2" : 13,"lvl.2" : 2}]}}]}}'</span>)
 
-  <p>getPlayerItems</p>
-  <span class="comment">
-   功能：获取玩家背包信息<br/>
-   参数类型：整数<br/>
-   参数详解：player - 玩家指针<br/>
-   返回值：背包信息字符串<br/>
-  </span>
-
-  [例] getPlayerItems(player)
-
   <p>getPlayerHand</p>
   <span class="comment">
    功能：获取玩家手持信息<br/>
@@ -326,26 +316,47 @@
   </span>
 
   [例] getPlayerItem(player,8)
+
+ <p>getPlayerItems</p>
+  <span class="comment">
+   功能：获取玩家背包信息<br/>
+   参数类型：整数<br/>
+   参数详解：player - 玩家指针<br/>
+   返回值：背包信息字符串<br/>
+  </span>
+
+  [例] getPlayerItems(player)
+
+  <p>getPlayerEnderChests</p>
+  <span class="comment">
+   功能：设置玩家末影箱背包<br/>
+   参数类型：整数 整数<br/>
+   参数详解：player - 玩家指针 <br/>
+   返回值：物品信息字符串<br/>
+  </span>
+
+  [例] getPlayerEnderChests(player)
   
-  <p>setPlayerItems</p>
+<p>setPlayerItems</p>
   <span class="comment">
    功能：设置玩家背包<br/>
-   参数类型：整数 整数<br/>
-   参数详解：player - 玩家指针 slot - 背包格子<br/>
+   参数类型：整数 字符串<br/>
+   参数详解：player - 玩家指针 x - 物品字符串<br/>
    返回值：是否设置成功<br/>
   </span>
 
-  [例] setPlayerItems(player,8)
+  [例] setPlayerItems(player,<span class="string">"[{'Block.10': {'name.8': 'minecraft:undyed_shulker_box', 'states.10': {}, 'version.3': 17825808}, 'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:undyed_shulker_box', 'WasPickedUp.1': 0, 'tag.10': {'Items.9': [{'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:enchanted_book', 'Slot.1': 0, 'WasPickedUp.1': 0, 'tag.10': {'ench.9': [{'id.2': 4, 'lvl.2': 1}]}}, {'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:netherite_sword', 'Slot.1': 1, 'WasPickedUp.1': 0, 'tag.10': {'RepairCost.3': 3, 'display.10': {'Name.8': '下界合金剑'}, 'ench.9': [{'id.2': 17, 'lvl.2': 3}, {'id.2': 13, 'lvl.2': 2}]}}]}}, {'Block.10': {'name.8': 'minecraft:undyed_shulker_box', 'states.10': {}, 'version.3': 17825808}, 'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:undyed_shulker_box', 'WasPickedUp.1': 0, 'tag.10': {'Items.9': [{'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:enchanted_book', 'Slot.1': 0, 'WasPickedUp.1': 0, 'tag.10': {'ench.9': [{'id.2': 4, 'lvl.2': 1}]}}, {'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:netherite_sword', 'Slot.1': 1, 'WasPickedUp.1': 0, 'tag.10': {'RepairCost.3': 3, 'display.10': {'Name.8': '下界合金剑'}, 'ench.9': [{'id.2': 17, 'lvl.2': 3}, {'id.2': 13, 'lvl.2': 2}]}}]}}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}]"</span>)
+
 
   <p>setPlayerEnderChests</p>
   <span class="comment">
    功能：设置玩家末影箱<br/>
-   参数类型：整数 整数<br/>
-   参数详解：player - 玩家指针 slot - 末影箱格子<br/>
+   参数类型：整数 字符串<br/>
+   参数详解：player - 玩家指针 x - 物品字符串<br/>
    返回值：是否设置成功<br/>
   </span>
 
-  [例] setPlayerEnderChests(player,8)
+  [例] setPlayerEnderChests(player,<span class="string">"[{'Block.10': {'name.8': 'minecraft:undyed_shulker_box', 'states.10': {}, 'version.3': 17825808}, 'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:undyed_shulker_box', 'WasPickedUp.1': 0, 'tag.10': {'Items.9': [{'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:enchanted_book', 'Slot.1': 0, 'WasPickedUp.1': 0, 'tag.10': {'ench.9': [{'id.2': 4, 'lvl.2': 1}]}}, {'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:netherite_sword', 'Slot.1': 1, 'WasPickedUp.1': 0, 'tag.10': {'RepairCost.3': 3, 'display.10': {'Name.8': '下界合金剑'}, 'ench.9': [{'id.2': 17, 'lvl.2': 3}, {'id.2': 13, 'lvl.2': 2}]}}]}}, {'Block.10': {'name.8': 'minecraft:undyed_shulker_box', 'states.10': {}, 'version.3': 17825808}, 'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:undyed_shulker_box', 'WasPickedUp.1': 0, 'tag.10': {'Items.9': [{'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:enchanted_book', 'Slot.1': 0, 'WasPickedUp.1': 0, 'tag.10': {'ench.9': [{'id.2': 4, 'lvl.2': 1}]}}, {'Count.1': 1, 'Damage.2': 0, 'Name.8': 'minecraft:netherite_sword', 'Slot.1': 1, 'WasPickedUp.1': 0, 'tag.10': {'RepairCost.3': 3, 'display.10': {'Name.8': '下界合金剑'}, 'ench.9': [{'id.2': 17, 'lvl.2': 3}, {'id.2': 13, 'lvl.2': 2}]}}]}}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}, {'Count.1': 0, 'Damage.2': 0, 'Name.8': '', 'WasPickedUp.1': 0}]"</span>)
 
   <p>setPlayerSidebar(敬请期待)</p>
   <span class="comment">
@@ -580,14 +591,6 @@
   <span class="string">player</span> - 玩家指针<br/>
   <span class="string">position</span> – 方块所在位置<br/>
   <span class="string">dimensionid</span> – 所处维度ID<br/>
-  
-  <p class="listen">(30)计分板改变</p>
-  拦截可否：否<br/>
-  回传数据：<br/>
-  <span class="string">scoreboardid</span> - 计分板ID<br/>
-  <span class="string">playersnum</span> – 玩家分数<br/>
-  <span class="string">objectivename</span> – 计分板名字<br/>
-  <span class="string">objectivedisname</span> – 计分板展示名字<br/>
   
  </div>
 </body>

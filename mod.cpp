@@ -558,7 +558,7 @@ api_function(setPlayerItems) {
 			Json::Value j = toJson(x);
 			if (j.type() == Json::arrayValue) {
 				vector<ItemStack*> is = p->getContainer()->getSlots();
-				for (int i = 0; i < j.size(); i++) {
+				for (unsigned i = 0; i < j.size(); i++) {
 					Tag* t = JsontoCompoundTag(j[i]);
 					is[i]->fromTag(t);
 					p->updateInventory();
@@ -578,7 +578,7 @@ api_function(setPlayerEnderChests) {
 			Json::Value j = toJson(x);
 			if (j.type() == Json::arrayValue) {
 				vector<ItemStack*> is = p->getEnderChestContainer()->getSlots();
-				for (int i = 0; i < j.size(); i++) {
+				for (unsigned i = 0; i < j.size(); i++) {
 					Tag* t = JsontoCompoundTag(j[i]);
 					is[i]->fromTag(t);
 					p->updateInventory();
