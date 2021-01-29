@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "BDS.hpp"
-#include "TAG.hpp"
 #pragma warning(disable:4996)
 #pragma region 宏定义
 #define api_method(name) {#name, api_##name, 1, 0}
@@ -30,6 +29,64 @@ static Json::Value toJson(const string& s) {
 		cout << (u8"JSON转换失败。。" + errs) << endl;
 	}
 	return jv;
+}
+bool isUTF8(const char* str) {
+	unsigned int nBytes = 0;//UFT8可用1-6个字节编码,ASCII用一个字节  
+	unsigned char chr = *str;
+	bool bAllAscii = true;
+
+	for (unsigned int i = 0; str[i] != '\0'; ++i) {
+		chr = *(str + i);
+		//判断是否ASCII编码,如果不是,说明有可能是UTF8,ASCII用7位编码,最高位标记为0,0xxxxxxx 
+		if (nBytes == 0 && (chr & 0x80) != 0) {
+			bAllAscii = false;
+		}
+
+		if (nBytes == 0) {
+			//如果不是ASCII码,应该是多字节符,计算字节数  
+			if (chr >= 0x80) {
+
+				if (chr >= 0xFC && chr <= 0xFD) {
+					nBytes = 6;
+				}
+				else if (chr >= 0xF8) {
+					nBytes = 5;
+				}
+				else if (chr >= 0xF0) {
+					nBytes = 4;
+				}
+				else if (chr >= 0xE0) {
+					nBytes = 3;
+				}
+				else if (chr >= 0xC0) {
+					nBytes = 2;
+				}
+				else {
+					return false;
+				}
+
+				nBytes--;
+			}
+		}
+		else {
+			//多字节符的非首字节,应为 10xxxxxx 
+			if ((chr & 0xC0) != 0x80) {
+				return false;
+			}
+			//减到为零为止
+			nBytes--;
+		}
+	}
+
+	//违返UTF8编码规则 
+	if (nBytes != 0) {
+		return false;
+	}
+
+	if (bAllAscii) { //如果全部都是ASCII, 也是UTF8
+		return true;
+	}
+	return true;
 }
 static bool callpy(const char* type, PyObject* val) {
 	bool result = true;
@@ -446,7 +503,7 @@ api_function(addItemEx) {
 	const char* x;
 	if (PyArg_ParseTuple(args, "Ks:addItemEx", &p, &x)) {
 		if (PlayerCheck(p)) {
-			Tag* t = JsontoTag(toJson(x));
+			Tag* t = JsontoCompoundTag(toJson(x));
 			ItemStack i;
 			i.fromTag(t);
 			p->addItem(&i);
@@ -463,7 +520,7 @@ api_function(getPlayerItems) {
 		if (PlayerCheck(p)) {
 			Json::Value j;
 			for (auto& i : p->getContainer()->getSlots()) {
-				j.append(i->save()->toJson());
+				j.append(toJson(i->save()));
 			}
 			return PyUnicode_FromString(j.toStyledString().c_str());
 		}
@@ -476,7 +533,7 @@ api_function(getPlayerHand) {
 	if (PyArg_ParseTuple(args, "K:getPlayerHand", &p)) {
 		if (PlayerCheck(p)) {
 			ItemStack* item = p->getSelectedItem();
-			return PyUnicode_FromString(item->save()->toJson().toStyledString().c_str());
+			return PyUnicode_FromString(toJson(item->save()).toStyledString().c_str());
 		}
 	}
 	return Py_False;
@@ -487,12 +544,52 @@ api_function(getPlayerItem) {
 	if (PyArg_ParseTuple(args, "Ki:getPlayerItem", &p, &slot)) {
 		if (PlayerCheck(p)) {
 			ItemStack* item = p->getInventoryItem(slot);
-			return PyUnicode_FromString(item->save()->toJson().toStyledString().c_str());
+			return PyUnicode_FromString(toJson(item->save()).toStyledString().c_str());
 		}
 	}
 	return Py_False;
 }
-// 方法列表
+// 设置玩家背包末影箱
+api_function(setPlayerItems) {
+	Player* p;
+	const char* x;
+	if (PyArg_ParseTuple(args, "Ks:setPlayerItems", &p, &x)) {
+		if (PlayerCheck(p)) {
+			Json::Value j = toJson(x);
+			if (j.type() == Json::arrayValue) {
+				vector<ItemStack*> is = p->getContainer()->getSlots();
+				for (int i = 0; i < j.size(); i++) {
+					Tag* t = JsontoCompoundTag(j[i]);
+					is[i]->fromTag(t);
+					p->updateInventory();
+					t->deCompound();
+				}
+				return Py_True;
+			}
+		}
+	}
+	return Py_False;
+}
+api_function(setPlayerEnderChests) {
+	Player* p;
+	const char* x;
+	if (PyArg_ParseTuple(args, "Ks:setPlayerEnderChests", &p, &x)) {
+		if (PlayerCheck(p)) {
+			Json::Value j = toJson(x);
+			if (j.type() == Json::arrayValue) {
+				vector<ItemStack*> is = p->getEnderChestContainer()->getSlots();
+				for (int i = 0; i < j.size(); i++) {
+					Tag* t = JsontoCompoundTag(j[i]);
+					is[i]->fromTag(t);
+					p->updateInventory();
+					t->deCompound();
+				}
+				return Py_True;
+			}
+		}
+	}
+	return Py_False;
+}
 PyMethodDef api_list[] = {
 api_method(logout),
 api_method(runcmd),
@@ -528,6 +625,8 @@ api_method(addItemEx),
 api_method(getPlayerItems),
 api_method(getPlayerHand),
 api_method(getPlayerItem),
+api_method(setPlayerItems),
+api_method(setPlayerEnderChests),
 {}
 };
 // 模块声明
@@ -575,7 +674,9 @@ Hook(后台输出, VA, "??$_Insert_string@DU?$char_traits@D@std@@_K@std@@YAAEAV?$bas
 }
 Hook(后台输入, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@AEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
 	VA _this, string* cmd) {
-	bool res = callpy(u8"后台输入", PyUnicode_FromString((*cmd).c_str()));
+	if (!isUTF8(cmd->c_str()))
+		return 0;
+	bool res = callpy(u8"后台输入", PyUnicode_FromString(cmd->c_str()));
 	check_ret(_this, cmd);
 }
 Hook(玩家加入, VA, "?onPlayerJoined@ServerScoreboard@@UEAAXAEBVPlayer@@@Z",
@@ -593,6 +694,13 @@ Hook(离开游戏, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer
 Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EAEBVVec3@@PEBVBlock@@@Z",
 	VA _this, ItemStack* item, BlockPos* bp, unsigned __int8 a4, VA v5, Block* b) {
 	Player* p = f(Player*, _this + 8);
+	//ItemStack i;
+	//i.fromTag(JsontoCompoundTag(toJson(item->save())));
+	//p->addItem(&i);
+	//for (auto& i : p->getContainer()->getSlots()) {
+	//	i->fromTag(item->save());
+	//}
+
 	short iid = item->getId();
 	short iaux = item->mAuxValue;
 	string iname = item->getName();
@@ -926,7 +1034,7 @@ void init() {
 	if (handle != -1) {
 		do {
 			//pts[name] = (VA)Py_NewInterpreter();
-			FILE* file = fopen(string("./py/").append(Info.name).c_str(), "rb");
+			FILE* file = fopen(((string)"./py/" + Info.name).c_str(), "rb");
 			Py_NewInterpreter();
 			printf("[BDSpyrunner] reading %s.\n", Info.name);
 			PyRun_SimpleFileExFlags(file, Info.name, 1, 0);
@@ -940,11 +1048,13 @@ int DllMain(VA, int dwReason, VA) {
 		//fstream of("bag.json");
 		//string str((std::istreambuf_iterator<char>(of)), std::istreambuf_iterator<char>());
 		//of.close();
+		//cout << toJson(JsontoListTag(toJson(R"([{"a.10":{}}])"))) << endl;
+		//cout << toJson(R"([{"a.10":{}}])") << endl;
 		PyPreConfig cfg;
 		PyPreConfig_InitIsolatedConfig(&cfg);
 		Py_PreInitialize(&cfg);
 		PyImport_AppendInittab("mc", mc_init); //增加一个模块
 		init();
-		puts("[BDSpyrunner] v0.1.2 for BDS1.16.201 loaded.");
+		puts("[BDSpyrunner] v0.1.3 for BDS1.16.201 loaded.");
 	} return 1;
 }

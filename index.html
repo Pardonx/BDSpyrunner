@@ -326,6 +326,26 @@
   </span>
 
   [例] getPlayerItem(player,8)
+  
+  <p>setPlayerItems</p>
+  <span class="comment">
+   功能：设置玩家背包<br/>
+   参数类型：整数 整数<br/>
+   参数详解：player - 玩家指针 slot - 背包格子<br/>
+   返回值：是否设置成功<br/>
+  </span>
+
+  [例] setPlayerItems(player,8)
+
+  <p>setPlayerEnderChests</p>
+  <span class="comment">
+   功能：设置玩家末影箱<br/>
+   参数类型：整数 整数<br/>
+   参数详解：player - 玩家指针 slot - 末影箱格子<br/>
+   返回值：是否设置成功<br/>
+  </span>
+
+  [例] setPlayerEnderChests(player,8)
 
   <p>setPlayerSidebar(敬请期待)</p>
   <span class="comment">
@@ -560,6 +580,14 @@
   <span class="string">player</span> - 玩家指针<br/>
   <span class="string">position</span> – 方块所在位置<br/>
   <span class="string">dimensionid</span> – 所处维度ID<br/>
+  
+  <p class="listen">(30)计分板改变</p>
+  拦截可否：否<br/>
+  回传数据：<br/>
+  <span class="string">scoreboardid</span> - 计分板ID<br/>
+  <span class="string">playersnum</span> – 玩家分数<br/>
+  <span class="string">objectivename</span> – 计分板名字<br/>
+  <span class="string">objectivedisname</span> – 计分板展示名字<br/>
   
  </div>
 </body>

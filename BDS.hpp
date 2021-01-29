@@ -1,7 +1,6 @@
 #pragma once
 #include "pch.h"
-#include "string_span.h"
-#include "TAG.hpp"
+#include "NBT.hpp"
 using namespace std;
 struct BlockLegacy {
 	string getBlockName() {
@@ -111,9 +110,6 @@ struct ItemStackBase {
 	}
 	bool isEmptyStack() {
 		return f(char, this + 34) == 0;
-	}
-	ItemStackBase* operator=(ItemStackBase* i) {
-		return SYMCALL<ItemStackBase*>("??4ItemStack@@QEAAAEAV0@AEBV0@@Z", this, i);
 	}
 	ItemStackBase* fromTag(Tag* t) {
 		return SYMCALL<ItemStackBase*>("?fromTag@ItemStack@@SA?AV1@AEBVCompoundTag@@@Z",
@@ -264,8 +260,8 @@ struct Player : Mob {
 		return (VA)this + 3040;		// IDA Player::setContainerManager 18
 	}
 	// 获取末影箱
-	VA getEnderChestContainer() {
-		return SYMCALL<VA>("?getEnderChestContainer@Player@@QEAAPEAVEnderChestContainer@@XZ", this);
+	Container* getEnderChestContainer() {
+		return SYMCALL<Container*>("?getEnderChestContainer@Player@@QEAAPEAVEnderChestContainer@@XZ", this);
 	}
 	// 设置一个装备
 	VA setArmor(int i, ItemStack* item) {
