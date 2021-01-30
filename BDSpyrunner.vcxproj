@@ -20,7 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <Library Include="chakra.lib" />
-    <Library Include="python39.lib" />
+    <Library Include="python36.lib" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="jsoncpp.cpp">
@@ -177,6 +177,8 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <Optimization>MaxSpeed</Optimization>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

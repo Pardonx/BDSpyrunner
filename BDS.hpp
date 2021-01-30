@@ -102,11 +102,11 @@ struct ItemStackBase {
 			this, &ct);
 		return ct;
 	}
-	CompoundTag* save() {
-		CompoundTag* ct;
+	Tag* save() {
+		Tag* t = 0;
 		SYMCALL("?save@ItemStackBase@@QEBA?AV?$unique_ptr@VCompoundTag@@U?$default_delete@VCompoundTag@@@std@@@std@@XZ",
-			this, &ct);
-		return ct;
+			this, &t);
+		return t;
 	}
 	bool isEmptyStack() {
 		return f(char, this + 34) == 0;
@@ -226,7 +226,6 @@ struct Mob : Actor {
 	}
 };
 struct Player : Mob {
-	// 取uuid
 	string getUuid() {// IDA ServerNetworkHandler::_createNewPlayer 217
 		string p;
 		SYMCALL<string&>("?asString@UUID@mce@@QEBA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ",
@@ -305,15 +304,10 @@ struct Player : Mob {
 		SYMCALL("?setPlayerPermissions@Abilities@@QEAAXW4PlayerPermissionLevel@@@Z",
 			this + 2192, m);
 	}
-	// 更新所有物品列表
-	void updateInventory() {
-		SYMCALL<VA>("?updateInventoryTransactions@Player@@QEAAXXZ",
-			this);
-
-		//SYMCALL<VA>("?forceBalanceTransaction@InventoryTransactionManager@@QEAAXXZ",
-			//*this + 4592);// IDA Player::drop 65
+	void sendInventroy() {
+		SYMCALL("?sendInventory@ServerPlayer@@UEAAX_N@Z",
+			this, true);
 	}
-	//传送
 	void teleport(Vec3 target, int dim) {
 		SYMCALL("?teleport@TeleportCommand@@SAXAEAVActor@@VVec3@@PEAV3@V?$AutomaticID@VDimension@@H@@VRelativeFloat@@4HAEBUActorUniqueID@@@Z",
 			this, target, 0, dim, 0, 0, 0, SYM("?INVALID_ID@ActorUniqueID@@2U1@B"));

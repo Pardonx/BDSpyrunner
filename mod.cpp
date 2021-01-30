@@ -17,6 +17,7 @@ static unordered_map<string, vector<PyObject*>> PyFuncs;//Py函数
 static unordered_map<Player*, bool> PlayerList;//玩家列表
 static unordered_map<string, string> Command;//注册命令
 static unordered_map<string, PyObject*> ShareData;//注册命令
+static int _Damage;//伤害值
 #pragma endregion
 #pragma region 函数定义
 static Json::Value toJson(const string& s) {
@@ -91,7 +92,7 @@ bool isUTF8(const char* str) {
 static bool callpy(const char* type, PyObject* val) {
 	bool result = true;
 	for (PyObject* fn : PyFuncs[type]) {
-		if (PyObject_CallOneArg(fn, val) == Py_False)
+		if (PyObject_CallFunctionObjArgs(fn, val) == Py_False)
 			result = false;
 	}
 	PyErr_Print();
@@ -101,7 +102,7 @@ static void delay(PyObject* func, PyObject* args, unsigned time) {
 	if (time)
 		Sleep(time);
 	if (PyCallable_Check(func))
-		PyObject_CallOneArg(func, args);
+		PyObject_CallFunctionObjArgs(func, args);
 }
 static unsigned ModalFormRequestPacket(Player* p, string str) {
 	unsigned fid = _formid++;
@@ -239,7 +240,7 @@ api_function(getShareData) {
 	if (PyArg_ParseTuple(args, "s:getShareData", &index)) {
 		return ShareData[index];
 	}
-	return _PyLong_Zero;
+	return Py_False;
 }
 // 设置指令说明
 api_function(setCommandDescription) {
@@ -273,7 +274,7 @@ api_function(sendSimpleForm) {
 		sprintf(str, R"({"title":"%s","content":"%s","buttons":%s,"type":"form"})", title, content, buttons);
 		return PyLong_FromLong(ModalFormRequestPacket(p, str));
 	}
-	return _PyLong_Zero;
+	return Py_False;
 }
 api_function(sendModalForm) {
 	Player* p; const char* title, * content, * button1, * button2;
@@ -282,7 +283,7 @@ api_function(sendModalForm) {
 		sprintf(str, R"({"title":"%s","content":"%s","button1":"%s","button2":"%s","type":"modal"})", title, content, button1, button2);
 		return PyLong_FromLong(ModalFormRequestPacket(p, str));
 	}
-	return _PyLong_Zero;
+	return Py_False;
 }
 // 跨服传送
 api_function(transferServer) {
@@ -336,7 +337,7 @@ api_function(getPlayerPerm) {
 			return PyLong_FromLong(p->getPermission());
 		}
 	}
-	return _PyLong_Zero;
+	return Py_False;
 }
 api_function(setPlayerPerm) {
 	Player* p; unsigned char lv;
@@ -384,7 +385,7 @@ api_function(getPlayerScore) {
 			else printf("bad objective:%s", obj);
 		}
 	}
-	return _PyLong_Zero;
+	return Py_False;
 }
 api_function(modifyPlayerScore) {
 	Player* p; const char* obj; int count; int mode;
@@ -478,7 +479,6 @@ api_function(createScoreBoardId) {
 	return Py_False;
 }
 //修改生物受伤的伤害值!
-int _Damage;
 api_function(setDamage) {
 	int a;
 	if (PyArg_ParseTuple(args, "i:setDamage", &a)) {
@@ -503,12 +503,11 @@ api_function(addItemEx) {
 	const char* x;
 	if (PyArg_ParseTuple(args, "Ks:addItemEx", &p, &x)) {
 		if (PlayerCheck(p)) {
-			Tag* t = JsontoCompoundTag(toJson(x));
+			Tag* t = toTag(toJson(x));
 			ItemStack i;
 			i.fromTag(t);
 			p->addItem(&i);
-			p->updateInventory();
-			t->deCompound();
+			delete t;
 			return Py_True;
 		}
 	}
@@ -559,14 +558,14 @@ api_function(setPlayerItems) {
 			if (j.type() == Json::arrayValue) {
 				vector<ItemStack*> is = p->getContainer()->getSlots();
 				for (unsigned i = 0; i < j.size(); i++) {
-					Tag* t = JsontoCompoundTag(j[i]);
+					Tag* t = toTag(j[i]);
 					is[i]->fromTag(t);
-					p->updateInventory();
-					t->deCompound();
+					delete t;
 				}
-				return Py_True;
+				p->sendInventroy();
 			}
 		}
+		return Py_True;
 	}
 	return Py_False;
 }
@@ -579,10 +578,10 @@ api_function(setPlayerEnderChests) {
 			if (j.type() == Json::arrayValue) {
 				vector<ItemStack*> is = p->getEnderChestContainer()->getSlots();
 				for (unsigned i = 0; i < j.size(); i++) {
-					Tag* t = JsontoCompoundTag(j[i]);
+					Tag* t = toTag(j[i]);
 					is[i]->fromTag(t);
-					p->updateInventory();
-					t->deCompound();
+					p->sendInventroy();
+					delete t;
 				}
 				return Py_True;
 			}
@@ -694,13 +693,7 @@ Hook(离开游戏, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer
 Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EAEBVVec3@@PEBVBlock@@@Z",
 	VA _this, ItemStack* item, BlockPos* bp, unsigned __int8 a4, VA v5, Block* b) {
 	Player* p = f(Player*, _this + 8);
-	//ItemStack i;
-	//i.fromTag(JsontoCompoundTag(toJson(item->save())));
-	//p->addItem(&i);
-	//for (auto& i : p->getContainer()->getSlots()) {
-	//	i->fromTag(item->save());
-	//}
-
+	//TextPacket(p, 0, toJson(item->save()).toStyledString());
 	short iid = item->getId();
 	short iaux = item->mAuxValue;
 	string iname = item->getName();
@@ -1048,13 +1041,15 @@ int DllMain(VA, int dwReason, VA) {
 		//fstream of("bag.json");
 		//string str((std::istreambuf_iterator<char>(of)), std::istreambuf_iterator<char>());
 		//of.close();
-		//cout << toJson(JsontoListTag(toJson(R"([{"a.10":{}}])"))) << endl;
-		//cout << toJson(R"([{"a.10":{}}])") << endl;
-		PyPreConfig cfg;
-		PyPreConfig_InitIsolatedConfig(&cfg);
-		Py_PreInitialize(&cfg);
+		//while (1) {
+		//	Tag* t = toTag(toJson(R"({"a1":2})"));
+		//	delete t;
+		//}
+		//PyPreConfig cfg;
+		//PyPreConfig_InitIsolatedConfig(&cfg);
+		//Py_PreInitialize(&cfg);
 		PyImport_AppendInittab("mc", mc_init); //增加一个模块
 		init();
-		puts("[BDSpyrunner] v0.1.3 for BDS1.16.201 loaded.");
+		puts("[BDSpyrunner] v0.1.4 for BDS1.16.201 loaded.");
 	} return 1;
 }
