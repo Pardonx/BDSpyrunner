@@ -15,9 +15,10 @@ static Scoreboard* _scoreboard;//储存计分板名称
 static unsigned _formid = 1;//表单ID
 static unordered_map<string, vector<PyObject*>> PyFuncs;//Py函数
 static unordered_map<Player*, bool> PlayerList;//玩家列表
-static unordered_map<string, string> Command;//注册命令
-static unordered_map<string, PyObject*> ShareData;//注册命令
+static vector<pair<string, string>> Command;//注册命令
+static unordered_map<string, PyObject*> ShareData;//共享数据
 static int _Damage;//伤害值
+static unordered_map<PyObject*, pair<unsigned, unsigned>> tick;//执行队列
 #pragma endregion
 #pragma region 函数定义
 static Json toJson(const char* s) {
@@ -91,12 +92,6 @@ static bool callpy(const char* type, PyObject* val) {
 	}
 	PyErr_Print();
 	return result;
-}
-static void delay(PyObject* func, PyObject* args, unsigned time) {
-	if (time)
-		Sleep(time);
-	if (PyCallable_Check(func))
-		PyObject_CallFunction(func, "O", args);
 }
 static unsigned ModalFormRequestPacket(Player* p, string str) {
 	unsigned fid = _formid++;
@@ -203,13 +198,22 @@ api_function(runcmd) {
 	}
 	return Py_False;
 }
-// 延时
-api_function(setTimeout) {
-	unsigned time; PyObject* func; PyObject* arg;
-	if (PyArg_ParseTuple(args, "OOI:setTimeout", &func, &arg, &time)) {
-		thread(delay, func, arg, time).detach();
+// 计时器
+api_function(setTimer) {
+	unsigned time; PyObject* func;
+	if (PyArg_ParseTuple(args, "OI:setTimer", &func, &time)) {
+		if (!PyCallable_Check(func))
+			return Py_False;
+		tick[func] = { time,time };
 	}
-	return Py_None;
+	return Py_True;
+}
+api_function(removeTimer) {
+	PyObject* func;
+	if (PyArg_ParseTuple(args, "O:removeTimer", &func, &time)) {
+		tick.erase(func);
+	}
+	return Py_True;
 }
 // 设置监听
 api_function(setListener) {
@@ -241,7 +245,7 @@ api_function(getShareData) {
 api_function(setCommandDescription) {
 	const char* cmd, * des;
 	if (PyArg_ParseTuple(args, "ss:setCommandDescribe", &cmd, &des)) {
-		Command[cmd] = des;
+		Command.push_back({ cmd,des });
 		return Py_True;
 	}
 	return Py_False;
@@ -502,6 +506,7 @@ api_function(addItemEx) {
 			ItemStack i;
 			i.fromTag(t);
 			p->addItem(&i);
+			p->sendInventroy();
 			delete t;
 			return Py_True;
 		}
@@ -587,7 +592,8 @@ api_function(setPlayerEnderChests) {
 PyMethodDef api_list[] = {
 api_method(logout),
 api_method(runcmd),
-api_method(setTimeout),
+api_method(setTimer),
+api_method(removeTimer),
 api_method(setListener),
 api_method(setShareData),
 api_method(getShareData),
@@ -630,6 +636,19 @@ extern "C" PyObject * mc_init() {
 }
 #pragma endregion
 #pragma region Hook
+Hook(世界Tick, void, "?tick@Level@@UEAAXXZ",
+	VA a1, VA a2, VA a3, VA a4) {
+	original(a1, a2, a3, a4);
+	if (tick.empty())
+		return;
+	for (auto& i : tick) {
+		if (!i.second.first) {
+			i.second.first = i.second.second;
+			PyObject_CallFunction(i.first, 0);
+		}
+		else i.second.first--;
+	}
+}
 Hook(获取指令队列, VA, "??0?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@QEAA@_K@Z",
 	VA _this) {
 	_cmdqueue = original(_this);
@@ -1040,7 +1059,7 @@ int DllMain(VA, int dwReason, VA) {
 			} while (!_findnext(handle, &Info));
 		}
 		_findclose(handle);
-		puts("[BDSpyrunner] v0.1.5 for BDS1.16.201 loaded.");
+		puts("[BDSpyrunner] v0.1.6 for BDS1.16.201 loaded.");
 	}
 	return 1;
 }
