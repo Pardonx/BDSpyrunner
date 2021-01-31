@@ -20,16 +20,10 @@ static unordered_map<string, PyObject*> ShareData;//注册命令
 static int _Damage;//伤害值
 #pragma endregion
 #pragma region 函数定义
-static Json::Value toJson(const string& s) {
-	Json::Value jv;
-	Json::CharReaderBuilder r;
-	JSONCPP_STRING errs;
-	std::unique_ptr<Json::CharReader> const jsonReader(r.newCharReader());
-	bool res = jsonReader->parse(s.c_str(), s.c_str() + s.length(), &jv, &errs);
-	if (!res || !errs.empty()) {
-		cout << (u8"JSON转换失败。。" + errs) << endl;
-	}
-	return jv;
+static Json toJson(const char* s) {
+	Json j;
+	j.fromString(s);
+	return static_cast<Json&&>(j);
 }
 bool isUTF8(const char* str) {
 	unsigned int nBytes = 0;//UFT8可用1-6个字节编码,ASCII用一个字节  
@@ -92,7 +86,7 @@ bool isUTF8(const char* str) {
 static bool callpy(const char* type, PyObject* val) {
 	bool result = true;
 	for (PyObject* fn : PyFuncs[type]) {
-		if (PyObject_CallFunctionObjArgs(fn, val) == Py_False)
+		if (PyObject_CallFunction(fn, "O", val) == Py_False)
 			result = false;
 	}
 	PyErr_Print();
@@ -102,7 +96,7 @@ static void delay(PyObject* func, PyObject* args, unsigned time) {
 	if (time)
 		Sleep(time);
 	if (PyCallable_Check(func))
-		PyObject_CallFunctionObjArgs(func, args);
+		PyObject_CallFunction(func, "O", args);
 }
 static unsigned ModalFormRequestPacket(Player* p, string str) {
 	unsigned fid = _formid++;
@@ -115,12 +109,13 @@ static unsigned ModalFormRequestPacket(Player* p, string str) {
 	}
 	return fid;
 }
-static bool TransferPacket(Player* p, string address, int port) {
+static bool TransferPacket(Player* p, const string& address, short port) {
 	if (PlayerCheck(p)) {
 		VA pkt;//TransferPacket
 		createPacket(&pkt, 85);
 		f(string, pkt + 40) = address;
-		f(VA, pkt + 72) = port;
+		f(short, pkt + 72) = port;
+		//Sleep(10);
 		p->sendPacket(pkt);
 		return true;
 	}
@@ -252,7 +247,7 @@ api_function(setCommandDescription) {
 	return Py_False;
 }
 api_function(getPlayerList) {
-	auto list = PyList_New(0);
+	auto list = PyList_New(PlayerList.size());
 	PyArg_ParseTuple(args, ":getPlayerList");
 	for (auto& p : PlayerList) {
 		PyList_Append(list, PyLong_FromUnsignedLongLong((VA)p.first));
@@ -517,7 +512,7 @@ api_function(getPlayerItems) {
 	Player* p;
 	if (PyArg_ParseTuple(args, "K:getPlayerItems", &p)) {
 		if (PlayerCheck(p)) {
-			Json::Value j;
+			Json j;
 			for (auto& i : p->getContainer()->getSlots()) {
 				j.append(toJson(i->save()));
 			}
@@ -554,10 +549,10 @@ api_function(setPlayerItems) {
 	const char* x;
 	if (PyArg_ParseTuple(args, "Ks:setPlayerItems", &p, &x)) {
 		if (PlayerCheck(p)) {
-			Json::Value j = toJson(x);
-			if (j.type() == Json::arrayValue) {
+			Json j = toJson(x);
+			if (j.getType() == _array) {
 				vector<ItemStack*> is = p->getContainer()->getSlots();
-				for (unsigned i = 0; i < j.size(); i++) {
+				for (unsigned i = 0; i < j.asArray().size(); i++) {
 					Tag* t = toTag(j[i]);
 					is[i]->fromTag(t);
 					delete t;
@@ -574,10 +569,10 @@ api_function(setPlayerEnderChests) {
 	const char* x;
 	if (PyArg_ParseTuple(args, "Ks:setPlayerEnderChests", &p, &x)) {
 		if (PlayerCheck(p)) {
-			Json::Value j = toJson(x);
-			if (j.type() == Json::arrayValue) {
+			Json j = toJson(x);
+			if (j.getType() == _array) {
 				vector<ItemStack*> is = p->getEnderChestContainer()->getSlots();
-				for (unsigned i = 0; i < j.size(); i++) {
+				for (unsigned i = 0; i < j.asArray().size(); i++) {
 					Tag* t = toTag(j[i]);
 					is[i]->fromTag(t);
 					p->sendInventroy();
@@ -715,7 +710,7 @@ Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EA
 Hook(放置方块, bool, "?mayPlace@BlockSource@@QEAA_NAEBVBlock@@AEBVBlockPos@@EPEAVActor@@_N@Z",
 	BlockSource* _this, Block* b, BlockPos* bp, unsigned __int8 a4, Actor* p, bool _bool) {
 	bool res = true;
-	if (p && PlayerCheck(p)) {
+	if (PlayerCheck(p)) {
 		BlockLegacy* bl = b->getBlockLegacy();
 		short bid = bl->getBlockItemID();
 		string bn = bl->getBlockName();
@@ -1019,37 +1014,33 @@ Hook(使用重生锚, bool, "?trySetSpawn@RespawnAnchorBlock@@CA_NAEAVPlayer@@AEBVBlo
 	check_ret(p, a2, a3, a4);
 }
 #pragma endregion
-void init() {
-	Py_Initialize();
-	//pts["main"] = (VA)PyThreadState_Get();
-	_finddata_t Info;//用于查找的句柄
-	long long handle = _findfirst("./py/*.py", &Info);
-	if (handle != -1) {
-		do {
-			//pts[name] = (VA)Py_NewInterpreter();
-			FILE* file = fopen(((string)"./py/" + Info.name).c_str(), "rb");
-			Py_NewInterpreter();
-			printf("[BDSpyrunner] reading %s.\n", Info.name);
-			PyRun_SimpleFileExFlags(file, Info.name, 1, 0);
-		} while (!_findnext(handle, &Info));
-		_findclose(handle);
-	}
-	else puts("[BDSpyrunner] can't find py directory.");
-}
 int DllMain(VA, int dwReason, VA) {
 	if (dwReason == 1) {
 		//fstream of("bag.json");
 		//string str((std::istreambuf_iterator<char>(of)), std::istreambuf_iterator<char>());
 		//of.close();
-		//while (1) {
-		//	Tag* t = toTag(toJson(R"({"a1":2})"));
-		//	delete t;
-		//}
+		//Tag* t = toTag(toJson(R"({"az10":{"9":[]}})"));
+		//cout << toJson(t).toStyledString() << endl;
+		//delete t;
 		//PyPreConfig cfg;
 		//PyPreConfig_InitIsolatedConfig(&cfg);
 		//Py_PreInitialize(&cfg);
 		PyImport_AppendInittab("mc", mc_init); //增加一个模块
-		init();
-		puts("[BDSpyrunner] v0.1.4 for BDS1.16.201 loaded.");
-	} return 1;
+		Py_Initialize();
+		//pts["main"] = (VA)PyThreadState_Get();
+		_finddata_t Info;//用于查找的句柄
+		long long handle = _findfirst("./py/*.py", &Info);
+		if (handle != -1) {
+			do {
+				//pts[name] = (VA)Py_NewInterpreter();
+				FILE* file = fopen(((string)"./py/" + Info.name).c_str(), "rb");
+				Py_NewInterpreter();
+				printf("[BDSpyrunner] reading %s.\n", Info.name);
+				PyRun_SimpleFileExFlags(file, Info.name, 1, 0);
+			} while (!_findnext(handle, &Info));
+		}
+		_findclose(handle);
+		puts("[BDSpyrunner] v0.1.5 for BDS1.16.201 loaded.");
+	}
+	return 1;
 }

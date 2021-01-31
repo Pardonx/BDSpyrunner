@@ -1,7 +1,7 @@
 #pragma once
 #include "pch.h"
 #include "BDS.hpp"
-#include "json/json.h"
+#include "Json.h"
 using namespace std;
 struct string_span {
 	size_t len;
@@ -9,7 +9,7 @@ struct string_span {
 	string_span(const char* s) : len(strlen(str)), str(s) {}
 	string_span(const std::string& s) : len(s.length()), str(s.c_str()) {}
 };
-enum Type {
+enum TagType {
 	End, Byte, Short, Int, Int64, Float,
 	Double, ByteArray, String, List, Compound,
 };
@@ -119,14 +119,14 @@ struct CompoundTagVariant {
 	auto& asList() { return *(vector<Tag*>*)((VA)this + 8); }
 	auto& asCompound() { return *(map<string, CompoundTagVariant>*)((VA)this + 8); }
 };
-Tag* newTag(Type t) {
+Tag* newTag(TagType t) {
 	Tag* x = 0;
 	SYMCALL<Tag*>("?newTag@Tag@@SA?AV?$unique_ptr@VTag@@U?$default_delete@VTag@@@std@@@std@@W4Type@1@@Z",
 		&x, t);
 	return x;
 }
-Json::Value toJson(Tag* t) {
-	Json::Value j;
+Json toJson(Tag* t) {
+	Json j;
 	for (auto& x : t->asCom()) {
 		switch (x.second.type()) {
 		case End:
@@ -164,10 +164,12 @@ Json::Value toJson(Tag* t) {
 	}
 	return j;
 }
-Tag* toTag(const Json::Value& j) {
+Tag* toTag(const Json& j) {
+	if (j.getType() != _object)
+		return 0;
 	Tag* c = new Tag;
-	for (auto x : j.getMemberNames()) {
-		string key = x;
+	for (auto& x : j.asObject()) {
+		string key = x.first;
 		auto e = key.end();
 		int type = 0;
 		if (*(e - 2) == '1' && *(e - 1) == '0') {
@@ -183,41 +185,41 @@ Tag* toTag(const Json::Value& j) {
 		switch (type) {
 		case End:break;
 		case Byte:
-			c->putByte(key, j[x].asInt());
+			c->putByte(key, x.second.asInt());
 			break;
 		case Short:
-			c->putShort(key, j[x].asInt());
+			c->putShort(key, x.second.asInt());
 			break;
 		case Int:
-			c->putInt(key, j[x].asInt());
+			c->putInt(key, x.second.asInt());
 			break;
 		case Int64:
-			c->putInt64(key, j[x].asInt());
+			c->putInt64(key, x.second.asInt());
 			break;
 		case Float:
-			c->putFloat(key, j[x].asFloat());
+			c->putFloat(key, (float)x.second.asDouble());
 			break;
 		case Double:
-			c->putFloat(key, j[x].asDouble());
+			c->putFloat(key, (float)x.second.asDouble());
 			break;
 		case ByteArray:break;
 		case String:
-			c->putString(key, j[x].asString());
+			c->putString(key, x.second.asString());
 			break;
 		case List:
 		{
-			Tag* clist = newTag(List);
-			for (auto& i : j[x]) {
-				Tag* listCom = toTag(i);
-				clist->add(listCom);
+			Tag* lt = newTag(List);
+			for (auto& i : x.second.asArray()) {
+				Tag* c2 = toTag(i);
+				lt->add(c2);
 			}
-			c->put(key, clist);
-			clist->deList();
+			c->put(key, lt);
+			lt->deList();
 		}
 		break;
 		case Compound:
 		{
-			Tag* ccc = toTag(j[x]);
+			Tag* ccc = toTag(x.second);
 			c->putCompound(key, ccc);
 		}
 		break;
