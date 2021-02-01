@@ -6,7 +6,7 @@
 #define api_function(name) static PyObject* api_##name(PyObject*, PyObject*args)
 #define check_ret(...) if (!res) return 0;return original(__VA_ARGS__)
 #define PlayerCheck(ptr)  PlayerList[(Player*)ptr]
-#define createPacket(pkt, i) SYMCALL("?createPacket@MinecraftPackets@@SA?AV?$shared_ptr@VPacket@@@std@@W4MinecraftPacketIds@@@Z",pkt,i);
+//#define createPacket(pkt, i) SYMCALL("?createPacket@MinecraftPackets@@SA?AV?$shared_ptr@VPacket@@@std@@W4MinecraftPacketIds@@@Z",pkt,i);
 #pragma endregion
 #pragma region 全局变量
 static VA _cmdqueue, _level, _ServerNetworkHandle;
@@ -84,6 +84,12 @@ bool isUTF8(const char* str) {
 	}
 	return true;
 }
+VA createPacket(char type) {
+	VA pkt;
+	SYMCALL<VA>("?createPacket@MinecraftPackets@@SA?AV?$shared_ptr@VPacket@@@std@@W4MinecraftPacketIds@@@Z",
+		&pkt, type);
+	return pkt;
+}
 static bool callpy(const char* type, PyObject* val) {
 	bool result = true;
 	for (PyObject* fn : PyFuncs[type]) {
@@ -96,8 +102,7 @@ static bool callpy(const char* type, PyObject* val) {
 static unsigned ModalFormRequestPacket(Player* p, string str) {
 	unsigned fid = _formid++;
 	if (PlayerCheck(p)) {
-		VA pkt;//ModalFormRequestPacket
-		createPacket(&pkt, 100);
+		VA pkt = createPacket(100);
 		f(unsigned, pkt + 40) = fid;
 		f(string, pkt + 48) = str;
 		p->sendPacket(pkt);
@@ -106,8 +111,7 @@ static unsigned ModalFormRequestPacket(Player* p, string str) {
 }
 static bool TransferPacket(Player* p, const string& address, short port) {
 	if (PlayerCheck(p)) {
-		VA pkt;//TransferPacket
-		createPacket(&pkt, 85);
+		VA pkt = createPacket(85);
 		f(string, pkt + 40) = address;
 		f(short, pkt + 72) = port;
 		//Sleep(10);
@@ -118,8 +122,7 @@ static bool TransferPacket(Player* p, const string& address, short port) {
 }
 static bool TextPacket(Player* p, char mode, string msg) {
 	if (PlayerCheck(p)) {
-		VA pkt;//TextPacket
-		createPacket(&pkt, 9);
+		VA pkt = createPacket(9);
 		f(char, pkt + 40) = mode;
 		f(string, pkt + 48) = p->getNameTag();
 		f(string, pkt + 80) = msg;
@@ -130,8 +133,7 @@ static bool TextPacket(Player* p, char mode, string msg) {
 }
 static bool CommandRequestPacket(Player* p, string cmd) {
 	if (PlayerCheck(p)) {
-		VA pkt;//CommandRequestPacket
-		createPacket(&pkt, 77);
+		VA pkt = createPacket(77);
 		f(string, pkt + 40) = cmd;
 		VA nid = p->getNetId();
 		SYMCALL<VA>("?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVCommandRequestPacket@@@Z", _ServerNetworkHandle, nid, pkt);
@@ -142,8 +144,7 @@ static bool CommandRequestPacket(Player* p, string cmd) {
 }
 static bool BossEventPacket(Player* p, string name, float per, int eventtype) {
 	if (PlayerCheck(p)) {
-		VA pkt;//BossEventPacket
-		createPacket(&pkt, 74);
+		VA pkt = createPacket(74);
 		f(VA, pkt + 48) = f(VA, pkt + 56) = f(VA, p->getUniqueID());
 		f(int, pkt + 64) = eventtype;//0显示,1更新,2隐藏,
 		f(string, pkt + 72) = name;
@@ -153,28 +154,28 @@ static bool BossEventPacket(Player* p, string name, float per, int eventtype) {
 	}
 	return false;
 }
-static bool setDisplayObjectivePacket(Player* p, string title, string name) {
+static bool setDisplayObjectivePacket(Player* p, const string& title, const string& name = "name") {
 	if (PlayerCheck(p)) {
-		VA pkt;//setDisplayObjectivePacket
-		createPacket(&pkt, 107);
+		VA pkt = createPacket(107);
 		f(string, pkt + 40) = "sidebar";
 		f(string, pkt + 72) = name;
 		f(string, pkt + 104) = title;
 		f(string, pkt + 136) = "dummy";
 		f(char, pkt + 168) = 0;
 		p->sendPacket(pkt);
+		return true;
 	}
-	return true;
+	return false;
 }
-static bool SetScorePacket(Player* p, char type, string name) {
+static bool SetScorePacket(Player* p, char type, const vector<ScorePacketInfo>& slot) {
 	if (PlayerCheck(p)) {
-		VA pkt;//SetScorePacket
-		createPacket(&pkt, 108);
+		VA pkt = createPacket(108);
 		f(char, pkt + 40) = type;//{set,remove}
-		//f(vector<ScorePacketInfo>, pkt + 48) = { s };
+		f(vector<ScorePacketInfo>, pkt + 48) = slot;
 		p->sendPacket(pkt);
+		return true;
 	}
-	return true;
+	return false;
 }
 #pragma endregion
 #pragma region API函数
@@ -555,7 +556,7 @@ api_function(setPlayerItems) {
 	if (PyArg_ParseTuple(args, "Ks:setPlayerItems", &p, &x)) {
 		if (PlayerCheck(p)) {
 			Json j = toJson(x);
-			if (j.getType() == _array) {
+			if (j.getType() == Json::_array) {
 				vector<ItemStack*> is = p->getContainer()->getSlots();
 				for (unsigned i = 0; i < j.asArray().size(); i++) {
 					Tag* t = toTag(j[i]);
@@ -575,19 +576,51 @@ api_function(setPlayerEnderChests) {
 	if (PyArg_ParseTuple(args, "Ks:setPlayerEnderChests", &p, &x)) {
 		if (PlayerCheck(p)) {
 			Json j = toJson(x);
-			if (j.getType() == _array) {
+			if (j.getType() == Json::_array) {
 				vector<ItemStack*> is = p->getEnderChestContainer()->getSlots();
 				for (unsigned i = 0; i < j.asArray().size(); i++) {
 					Tag* t = toTag(j[i]);
 					is[i]->fromTag(t);
-					p->sendInventroy();
 					delete t;
 				}
+				p->sendInventroy();
 				return Py_True;
 			}
 		}
 	}
 	return Py_False;
+}
+// 设置玩家侧边栏
+api_function(setSidebar) {
+	Player* p;
+	const char* title;
+	const char* data;
+	if (PyArg_ParseTuple(args, "Kss:setSidebar", &p, &title, &data)) {
+		if (PlayerCheck(p)) {
+			Json j = toJson(data);
+			setDisplayObjectivePacket(p, title);
+			if (j.getType() == Json::_object) {
+				vector<ScorePacketInfo> info;
+				for (auto& x : j.asObject()) {
+					ScorePacketInfo o(_scoreboard->createScoreBoardId(x.first),
+						x.second.asInt(), x.first);
+					info.push_back(o);
+				}
+				SetScorePacket(p, 0, info);
+				return Py_True;
+			}
+		}
+	}
+	return Py_False;
+}
+api_function(removeSidebar) {
+	Player* p;
+	if (PyArg_ParseTuple(args, "K:removeSidebar", &p)) {
+		if (PlayerCheck(p)) {
+			setDisplayObjectivePacket(p, "", "");
+		}
+	}
+	return Py_None;
 }
 PyMethodDef api_list[] = {
 api_method(logout),
@@ -627,6 +660,8 @@ api_method(getPlayerHand),
 api_method(getPlayerItem),
 api_method(setPlayerItems),
 api_method(setPlayerEnderChests),
+api_method(setSidebar),
+api_method(removeSidebar),
 {}
 };
 // 模块声明
@@ -1059,7 +1094,7 @@ int DllMain(VA, int dwReason, VA) {
 			} while (!_findnext(handle, &Info));
 		}
 		_findclose(handle);
-		puts("[BDSpyrunner] v0.1.6 for BDS1.16.201 loaded.");
+		puts("[BDSpyrunner] v0.1.7 for BDS1.16.201 loaded.");
 	}
 	return 1;
 }

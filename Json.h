@@ -10,20 +10,15 @@ using std::to_string;
 using std::cerr;
 using std::endl;
 
-enum Type {
-	_null, _bool, _int, _longlong,
-	_double, _string, _array, _object
-};
 class Json {
+public:
 	using Array = std::vector<Json>;
 	using Object = std::map<string, Json>;
-	union Var {
-		bool b; int i; long long l; double d;
-		string* s; Array* a; Object* o;
-	} data;
-	Type t;
+	enum Type {
+		_null, _bool, _int, _longlong,
+		_double, _string, _array, _object
+	};
 
-public:
 	inline auto& asBool()const { return data.b; }
 	inline auto& asInt()const { return data.i; }
 	inline auto& asLongLong()const { return data.l; }
@@ -191,6 +186,7 @@ public:
 		}
 		return "";
 	}
+
 	Type getType()const { return t; }
 	void remove(const unsigned i) {
 		if (t == _array)
@@ -315,11 +311,7 @@ private:
 		Error(const char* s) :data(s) {}
 		Error(const string& s) :data(s) {}
 		Error(const string& s, const char* it) {
-			string str(it - 5, 11);
-			for (auto& c : str) {
-				if (c == '\n')
-					c = 0;
-			}
+			string str(it - 7, 15);
 			data = s + '\n' + str;
 		}
 	};
@@ -464,5 +456,11 @@ private:
 		}
 		return s;
 	}
+
+	union Var {
+		bool b; int i; long long l; double d;
+		string* s; Array* a; Object* o;
+	} data;
+	Type t;
 };
 static_assert(sizeof(Json) == 16);

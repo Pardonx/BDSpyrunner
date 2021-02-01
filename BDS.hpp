@@ -313,7 +313,6 @@ struct Player : Mob {
 			this, target, 0, dim, 0, 0, 0, SYM("?INVALID_ID@ActorUniqueID@@2U1@B"));
 	}
 };
-struct ScoreboardId;
 struct PlayerScore {
 	VA getscore() {
 		return f(VA, this + 4);
@@ -330,9 +329,23 @@ struct ScoreInfo {
 };
 struct ScoreboardId {
 	int id;
+	VA null;
+};
+struct ScorePacketInfo {
+	ScoreboardId sid;
+	string obj_name = "name";
+	unsigned score;
+	enum Type : char { Invalid = 0, Player = 1, Actor = 2, Fake = 3 };
+	Type type = Fake;
+	VA pid;
+	VA aid;
+	string fake_name;
+
+	ScorePacketInfo(ScoreboardId* s, unsigned num, const string& fake) :
+		sid(*s), score(num), fake_name(fake) {}
+
 };
 struct Objective {
-	//从objective::objective得到
 	//获取计分板名称
 	auto getScoreName() {
 		return f(string, this + 64);
@@ -354,11 +367,15 @@ struct Scoreboard {
 	auto getObjective(string str) {
 		return SYMCALL<Objective*>("?getObjective@Scoreboard@@QEBAPEAVObjective@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z", this, &str);
 	}
-	auto getScoreboardId(string* str) {
-		return SYMCALL<ScoreboardId*>("?getScoreboardId@Scoreboard@@QEBAAEBUScoreboardId@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z", this, str);
+	auto getScoreboardId(const string& str) {
+		return SYMCALL<ScoreboardId*>("?getScoreboardId@Scoreboard@@QEBAAEBUScoreboardId@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
+			this, &str);
 	}
-	vector<Objective*>* getObjectives() {
-		return SYMCALL<vector<Objective*>*>("?getObjectives@Scoreboard@@QEBA?AV?$vector@PEBVObjective@@V?$allocator@PEBVObjective@@@std@@@std@@XZ", this);
+	vector<Objective*> getObjectives() {
+		vector<Objective*> s;
+		SYMCALL("?getObjectives@Scoreboard@@QEBA?AV?$vector@PEBVObjective@@V?$allocator@PEBVObjective@@@std@@@std@@XZ",
+			this, &s);
+		return s;
 	}
 	auto getDisplayInfoFiltered(string* str) {
 		return SYMCALL<vector<PlayerScore>*>("?getDisplayInfoFiltered@Scoreboard@@QEBA?AV?$vector@UPlayerScore@@V?$allocator@UPlayerScore@@@std@@@std@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@3@@Z", this, str);
@@ -374,6 +391,10 @@ struct Scoreboard {
 		bool a2 = true;
 		return SYMCALL<int>("?modifyPlayerScore@Scoreboard@@QEAAHAEA_NAEBUScoreboardId@@AEAVObjective@@HW4PlayerScoreSetFunction@@@Z",
 			this, &a2, a3, a4, count, mode);
+	}
+	auto createScoreBoardId(const string& s) {
+		return SYMCALL<ScoreboardId*>("?createScoreboardId@ServerScoreboard@@UEAAAEBUScoreboardId@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
+			this, &s);
 	}
 	auto createScoreBoardId(Player* player) {
 		return SYMCALL<ScoreboardId*>("?createScoreboardId@ServerScoreboard@@UEAAAEBUScoreboardId@@AEBVPlayer@@@Z", this, player);

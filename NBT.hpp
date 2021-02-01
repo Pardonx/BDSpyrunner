@@ -165,7 +165,7 @@ Json toJson(Tag* t) {
 	return j;
 }
 Tag* toTag(const Json& j) {
-	if (j.getType() != _object)
+	if (j.getType() != Json::_object)
 		return 0;
 	Tag* c = new Tag;
 	for (auto& x : j.asObject()) {
