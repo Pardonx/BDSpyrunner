@@ -26,7 +26,7 @@ static Json toJson(const char* s) {
 	j.fromString(s);
 	return static_cast<Json&&>(j);
 }
-bool isUTF8(const char* str) {
+static bool isUTF8(const char* str) {
 	unsigned int nBytes = 0;//UFT8可用1-6个字节编码,ASCII用一个字节  
 	unsigned char chr = *str;
 	bool bAllAscii = true;
@@ -84,7 +84,7 @@ bool isUTF8(const char* str) {
 	}
 	return true;
 }
-VA createPacket(char type) {
+static inline VA createPacket(char type) {
 	VA pkt;
 	SYMCALL<VA>("?createPacket@MinecraftPackets@@SA?AV?$shared_ptr@VPacket@@@std@@W4MinecraftPacketIds@@@Z",
 		&pkt, type);
@@ -93,7 +93,7 @@ VA createPacket(char type) {
 static bool callpy(const char* type, PyObject* val) {
 	bool result = true;
 	for (PyObject* fn : PyFuncs[type]) {
-		if (PyObject_CallFunction(fn, "O", val) == Py_False)
+		if (PyObject_CallOneArg(fn, val) == Py_False)
 			result = false;
 	}
 	PyErr_Print();
@@ -382,7 +382,7 @@ api_function(getPlayerScore) {
 				auto score = testobj->getPlayerScore(id);
 				return PyLong_FromLong(score->getCount());
 			}
-			else printf("bad objective:%s", obj);
+			else cout << "bad objective: " << obj << endl;
 		}
 	}
 	return Py_False;
@@ -397,7 +397,7 @@ api_function(modifyPlayerScore) {
 				_scoreboard->modifyPlayerScore((ScoreboardId*)_scoreboard->getScoreboardId(p), testobj, count, mode);
 				return Py_True;
 			}
-			else printf("bad objective:%s", obj);
+			else cout << "bad objective: " << obj << endl;
 		}
 	}
 	return Py_False;
@@ -679,7 +679,7 @@ Hook(世界Tick, void, "?tick@Level@@UEAAXXZ",
 	for (auto& i : tick) {
 		if (!i.second.first) {
 			i.second.first = i.second.second;
-			PyObject_CallFunction(i.first, 0);
+			PyObject_CallNoArgs(i.first);
 		}
 		else i.second.first--;
 	}
@@ -721,10 +721,10 @@ Hook(后台输出, VA, "??$_Insert_string@DU?$char_traits@D@std@@_K@std@@YAAEAV?$bas
 	return original(handle, str, size);
 }
 Hook(后台输入, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@AEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
-	VA _this, string* cmd) {
-	if (!isUTF8(cmd->c_str()))
+	VA _this, string& cmd) {
+	if (!isUTF8(cmd.c_str()))
 		return 0;
-	bool res = callpy(u8"后台输入", PyUnicode_FromString(cmd->c_str()));
+	bool res = callpy(u8"后台输入", PyUnicode_FromString(cmd.c_str()));
 	check_ret(_this, cmd);
 }
 Hook(玩家加入, VA, "?onPlayerJoined@ServerScoreboard@@UEAAXAEBVPlayer@@@Z",
@@ -866,7 +866,7 @@ Hook(切换维度, bool, "?_playerChangeDimension@Level@@AEAA_NPEAVPlayer@@AEAVChang
 	VA _this, Player* p, VA req) {
 	bool result = original(_this, p, req);
 	if (result) {
-		callpy(u8"切换纬度", PyLong_FromUnsignedLongLong((VA)p));
+		callpy(u8"切换维度", PyLong_FromUnsignedLongLong((VA)p));
 	}
 	return result;
 }
@@ -1073,12 +1073,17 @@ int DllMain(VA, int dwReason, VA) {
 		//fstream of("bag.json");
 		//string str((std::istreambuf_iterator<char>(of)), std::istreambuf_iterator<char>());
 		//of.close();
-		//Tag* t = toTag(toJson(R"({"az10":{"9":[]}})"));
+		//Tag* t = toTag(toJson(R"({"az9":[{"p1":2}]})"));
 		//cout << toJson(t).toStyledString() << endl;
 		//delete t;
-		//PyPreConfig cfg;
-		//PyPreConfig_InitIsolatedConfig(&cfg);
-		//Py_PreInitialize(&cfg);
+		PyPreConfig cfg;
+		PyPreConfig_InitPythonConfig(&cfg);
+		cfg.utf8_mode = 1;
+		cfg.configure_locale = 0;
+		PyStatus status = Py_PreInitialize(&cfg);
+		if (PyStatus_Exception(status)) {
+			Py_ExitStatusException(status);
+		}
 		PyImport_AppendInittab("mc", mc_init); //增加一个模块
 		Py_Initialize();
 		//pts["main"] = (VA)PyThreadState_Get();
@@ -1088,7 +1093,7 @@ int DllMain(VA, int dwReason, VA) {
 			do {
 				//pts[name] = (VA)Py_NewInterpreter();
 				FILE* file = fopen(((string)"./py/" + Info.name).c_str(), "rb");
-				Py_NewInterpreter();
+				auto in = Py_NewInterpreter();
 				printf("[BDSpyrunner] reading %s.\n", Info.name);
 				PyRun_SimpleFileExFlags(file, Info.name, 1, 0);
 			} while (!_findnext(handle, &Info));

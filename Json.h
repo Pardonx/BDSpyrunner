@@ -199,6 +199,10 @@ public:
 	void append(const Json& j) {
 		if (t == _array)
 			data.a->push_back(j);
+		else if (t == _null) {
+			*this = _array;
+			data.a->push_back(j);
+		}
 	}
 	bool empty()const {
 		switch (t) {
@@ -288,7 +292,7 @@ public:
 		return *this;
 	};
 
-#define CHECK_END if(!*it)throw Error("Unexpected null character")
+#define CHECK_END if(!*it) throw Error("Unexpected character");
 #define skip while (*it == ' ' or *it == '\n' or *it == '\t' or *it == '\r')it++
 	bool fromString(const char* s) {
 		clear();
@@ -296,11 +300,11 @@ public:
 			parse_value(s);
 		}
 		catch (const Error& x) {
-			cerr << x.data << endl;
+			cerr << "[Json] " << x.data << endl;
 			return 0;
 		}
 		catch (...) {
-			cerr << "Unknown exception\n";
+			cerr << "[Json] Unknown exception\n";
 			return 0;
 		}
 		return 1;
@@ -312,6 +316,10 @@ private:
 		Error(const string& s) :data(s) {}
 		Error(const string& s, const char* it) {
 			string str(it - 7, 15);
+			for (auto& c : str) {
+				if (c == '\n')
+					c = 0;
+			}
 			data = s + '\n' + str;
 		}
 	};
@@ -320,15 +328,15 @@ private:
 		switch (*it) {
 		case 'n':
 			if (!strncmp(it, "null", 4))it += 4;
-			else throw Error("Missing \"null\" at", it);
+			else throw Error("Missing \"null\"", it);
 			break;
 		case 't':
 			if (!strncmp(it, "true", 4)) { *this = true; it += 4; }
-			else throw Error("Missing \"true\" at", it);
+			else throw Error("Missing \"true\"", it);
 			break;
 		case 'f':
 			if (!strncmp(it, "false", 5)) { *this = false; it += 5; }
-			else throw Error("Missing \"true\" at", it);
+			else throw Error("Missing \"false\"", it);
 			break;
 		case '[': parse_array(it); break;
 		case '{': parse_object(it); break;
@@ -337,7 +345,7 @@ private:
 			if (*it == '-' || (*it >= '0' && *it <= '9')) {
 				parse_number(it);
 			}
-			else throw Error("Unexpected character at", it);
+			else throw Error("Unexpected character", it);
 		}
 	}
 	void parse_number(const char*& it) {
@@ -365,12 +373,12 @@ private:
 			skip;
 			CHECK_END;
 			if (*it != '"')
-				throw Error("Missing \" at", it);
+				throw Error("Missing '\"'", it);
 			string key = parse_string(it);
 			skip;
 			CHECK_END;
 			if (*it != ':')
-				throw Error("Missing : at", it);
+				throw Error("Missing ':'", it);
 			it++;
 			skip;
 			CHECK_END;
@@ -386,7 +394,7 @@ private:
 			else if (*it == ',')
 				it++;
 			else {
-				throw Error("Missing , or } at", it);
+				throw Error("Missing ',' or '}'", it);
 			}
 		}
 	}
@@ -409,7 +417,27 @@ private:
 				case 'b': s += '\b'; break;
 				case '/': s += '/'; break;
 				case '\\': s += '\\'; break;
-				default:throw Error("Unknown escape sequence at", it);
+				case 'u': {
+					unsigned u = 0;
+					parse_hex4(it, u);
+					if (u >= 0xD800 && u <= 0xDBFF) {
+						CHECK_END;
+						if (*it++ != '\\')
+							throw Error("Invalid UNICODE surrogate", it);
+						if (*it++ != 'u')
+							throw Error("Invalid UNICODE surrogate", it);
+						unsigned tmp_u;
+						parse_hex4(it, tmp_u);
+						if (tmp_u < 0xDC00 || tmp_u > 0xDFFF)
+							throw Error("Invalid UNICODE surrogate", it);
+						u = 0x10000 + (u - 0xD800) * 0x400 + (tmp_u - 0xDC00);
+					}
+					if (u > 0x10FFFF)
+						throw Error("Invalid UNICODE hex", it);
+					encode_utf8(u, s);
+					break;
+				}
+				default:throw Error("Unknown escape", it);
 				}
 				break;
 			default:
@@ -442,7 +470,7 @@ private:
 				break;
 			}
 			else
-				throw Error("Missing , or ] at", it);
+				throw Error("Missing ',' or ']'", it);
 		}
 	}
 	static string tostring(const double d) {
@@ -455,6 +483,41 @@ private:
 				break;
 		}
 		return s;
+	}
+	static void parse_hex4(const char*& it, unsigned& u) {
+		u = 0;
+		char ch = 0;
+		for (int i = 0; i < 4; i++) {
+			u <<= 4;
+			CHECK_END;
+			ch = *it++;
+			if (ch >= '0' && ch <= '9')
+				u |= ch - '0';
+			else if (ch >= 'a' && ch <= 'f')
+				u |= ch - 'a' + 10;
+			else if (ch >= 'A' && ch <= 'F')
+				u |= ch - 'A' + 10;
+			else throw Error("Unknown hex", it);
+		}
+	}
+	static void encode_utf8(unsigned& u, string& s) {
+		if (u <= 0x7F)
+			s += (u & 0xFF);
+		else if (u <= 0x7FF) {
+			s += (0xC0 | (0xFF & (u >> 6)));
+			s += (0x80 | (0x3F & u));
+		}
+		else if (u <= 0xffff) {
+			s += (0xE0 | (0xFF & (u >> 12)));
+			s += (0x80 | (0x3F & (u >> 6)));
+			s += (0x80 | (0x3F & u));
+		}
+		else {
+			s += (0xF0 | (0xFF & (u >> 18)));
+			s += (0x80 | (0x3F & (u >> 12)));
+			s += (0x80 | (0x3F & (u >> 6)));
+			s += (0x80 | (0x3F & u));
+		}
 	}
 
 	union Var {

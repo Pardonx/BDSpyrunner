@@ -119,11 +119,11 @@ struct CompoundTagVariant {
 	auto& asList() { return *(vector<Tag*>*)((VA)this + 8); }
 	auto& asCompound() { return *(map<string, CompoundTagVariant>*)((VA)this + 8); }
 };
-Tag* newTag(TagType t) {
-	Tag* x = 0;
-	SYMCALL<Tag*>("?newTag@Tag@@SA?AV?$unique_ptr@VTag@@U?$default_delete@VTag@@@std@@@std@@W4Type@1@@Z",
-		&x, t);
-	return x;
+Tag* newListTag() {
+	Tag* t = 0;
+	SYMCALL("??$make_unique@VListTag@@$$V$0A@@std@@YA?AV?$unique_ptr@VListTag@@U?$default_delete@VListTag@@@std@@@0@XZ",
+		&t);
+	return t;
 }
 Json toJson(Tag* t) {
 	Json j;
@@ -154,8 +154,9 @@ Json toJson(Tag* t) {
 			j[x.first + to_string(String)] = x.second.asString();
 			break;
 		case List:
-			for (auto i : x.second.asList())
+			for (auto& i : x.second.asList()) {
 				j[x.first + to_string(List)].append(toJson(i));
+			}
 			break;
 		case Compound:
 			j[x.first + to_string(Compound)] = toJson((Tag*)&x.second);
@@ -208,7 +209,7 @@ Tag* toTag(const Json& j) {
 			break;
 		case List:
 		{
-			Tag* lt = newTag(List);
+			Tag* lt = newListTag();
 			for (auto& i : x.second.asArray()) {
 				Tag* c2 = toTag(i);
 				lt->add(c2);
