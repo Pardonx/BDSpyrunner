@@ -1139,14 +1139,13 @@ int DllMain(VA, int dwReason, VA) {
 		}
 		PyImport_AppendInittab("mc", mc_init); //增加一个模块
 		Py_Initialize();
-		//pts["main"] = (VA)PyThreadState_Get();
 		_finddata_t Info;//用于查找的句柄
 		long long handle = _findfirst("./py/*.py", &Info);
 		if (handle != -1) {
 			do {
 				//pts[name] = (VA)Py_NewInterpreter();
 				FILE* file = fopen(((string)"./py/" + Info.name).c_str(), "rb");
-				auto in = Py_NewInterpreter();
+				Py_NewInterpreter();
 				printf(u8"[BDSpyrunner] 读取 %s.\n", Info.name);
 				PyRun_SimpleFileExFlags(file, Info.name, 1, 0);
 			} while (!_findnext(handle, &Info));
