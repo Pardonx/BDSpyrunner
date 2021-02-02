@@ -5,9 +5,8 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include <variant>
-#include <map>
 #include <unordered_map>
+#include "json/json.h"
 #include "include/Python.h"
 #define f(type, ptr) (*(type*)(ptr))
 #define SYM GetServerSymbol

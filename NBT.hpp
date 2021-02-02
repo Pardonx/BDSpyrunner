@@ -1,7 +1,6 @@
 #pragma once
 #include "pch.h"
 #include "BDS.hpp"
-#include "Json.h"
 using namespace std;
 struct string_span {
 	size_t len;
@@ -26,10 +25,6 @@ struct Tag {
 	}
 	~Tag() {
 		SYMCALL("??1CompoundTag@@UEAA@XZ", this);
-	}
-	void add(Tag*& t) {
-		SYMCALL("?add@ListTag@@QEAAXV?$unique_ptr@VTag@@U?$default_delete@VTag@@@std@@@std@@@Z",
-			this, &t);
 	}
 	void put(const string& key, const Tag* value) {
 		return SYMCALL("?put@CompoundTag@@QEAAAEAVTag@@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$$QEAV2@@Z",
@@ -68,39 +63,11 @@ struct Tag {
 		return SYMCALL("?putCompound@CompoundTag@@QEAAPEAV1@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$unique_ptr@VCompoundTag@@U?$default_delete@VCompoundTag@@@std@@@3@@Z",
 			this, key, &value);
 	}
-	Tag* clone(Tag* a1) {
-		return SYMCALL<Tag*>("?clone@CompoundTag@@QEBA?AV?$unique_ptr@VCompoundTag@@U?$default_delete@VCompoundTag@@@std@@@std@@XZ",
-			this, a1);
-	}
-	bool Has(string_span s) {
-		return SYMCALL<bool>("?contains@CompoundTag@@QEBA_NV?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	unsigned char getByte(string_span s) {
-		return SYMCALL<unsigned char>("?getByte@CompoundTag@@QEBAEV?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	int getInt(string_span s) {
-		return SYMCALL<int>("?getInt@CompoundTag@@QEBAHV?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	int getShort(string_span s) {
-		return SYMCALL<int>("?getShort@CompoundTag@@QEBAFV?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	string getString(string_span s) {
-		return *SYMCALL<string*>("?getString@CompoundTag@@QEBAAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	Tag* getList(string_span s) {
-		return SYMCALL<Tag*>("?getList@CompoundTag@@QEAAPEAVListTag@@V?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
-	Tag* getCompound(string_span s) {
-		return SYMCALL<Tag*>("?getCompound@CompoundTag@@QEAAPEAV1@V?$basic_string_span@$$CBD$0?0@gsl@@@Z",
-			this, s);
-	}
 
+	void add(Tag*& t) {
+		SYMCALL("?add@ListTag@@QEAAXV?$unique_ptr@VTag@@U?$default_delete@VTag@@@std@@@std@@@Z",
+			this, &t);
+	}
 	void deList() {
 		SYMCALL("??1ListTag@@UEAA@XZ", this);
 	}
@@ -125,8 +92,8 @@ Tag* newListTag() {
 		&t);
 	return t;
 }
-Json toJson(Tag* t) {
-	Json j;
+Json::Value toJson(Tag* t) {
+	Json::Value j;
 	for (auto& x : t->asCom()) {
 		switch (x.second.type()) {
 		case End:
@@ -163,14 +130,14 @@ Json toJson(Tag* t) {
 			break;
 		}
 	}
-	return j;
+	return move(j);
 }
-Tag* toTag(const Json& j) {
-	if (j.getType() != Json::_object)
+Tag* toTag(const Json::Value& j) {
+	if (!j.isObject())
 		return 0;
 	Tag* c = new Tag;
-	for (auto& x : j.asObject()) {
-		string key = x.first;
+	for (auto& x : j.getMemberNames()) {
+		string key = x;
 		auto e = key.end();
 		int type = 0;
 		if (*(e - 2) == '1' && *(e - 1) == '0') {
@@ -186,31 +153,31 @@ Tag* toTag(const Json& j) {
 		switch (type) {
 		case End:break;
 		case Byte:
-			c->putByte(key, x.second.asInt());
+			c->putByte(key, j[x].asInt());
 			break;
 		case Short:
-			c->putShort(key, x.second.asInt());
+			c->putShort(key, j[x].asInt());
 			break;
 		case Int:
-			c->putInt(key, x.second.asInt());
+			c->putInt(key, j[x].asInt());
 			break;
 		case Int64:
-			c->putInt64(key, x.second.asInt());
+			c->putInt64(key, j[x].asInt());
 			break;
 		case Float:
-			c->putFloat(key, (float)x.second.asDouble());
+			c->putFloat(key, j[x].asFloat());
 			break;
 		case Double:
-			c->putFloat(key, (float)x.second.asDouble());
+			c->putFloat(key, (float)j[x].asDouble());
 			break;
 		case ByteArray:break;
 		case String:
-			c->putString(key, x.second.asString());
+			c->putString(key, j[x].asString());
 			break;
 		case List:
 		{
 			Tag* lt = newListTag();
-			for (auto& i : x.second.asArray()) {
+			for (auto& i : j[x]) {
 				Tag* c2 = toTag(i);
 				lt->add(c2);
 			}
@@ -220,7 +187,7 @@ Tag* toTag(const Json& j) {
 		break;
 		case Compound:
 		{
-			Tag* ccc = toTag(x.second);
+			Tag* ccc = toTag(j[x]);
 			c->putCompound(key, ccc);
 		}
 		break;

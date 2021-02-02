@@ -43,16 +43,6 @@ struct Level {};
 struct Vec3 { float x = 0.0f, y = 0.0f, z = 0.0f; };
 struct Vec2 { float x = 0.0f, y = 0.0f; };
 struct MobEffectInstance { char fill[0x1C]; };
-
-struct EnchantmentInstance {
-	int type;
-	int level;
-};
-struct ItemEnchants {
-	int slot;
-	std::vector<EnchantmentInstance> list[3];
-};
-
 struct Item;
 struct ItemStackBase {
 	VA vtable;
@@ -136,6 +126,9 @@ struct Container {
 			this, &s);
 		return s;
 	}
+	void clearItem(int slot, int num) {
+		SYMCALL("?removeItem@Container@@UEAAXHH@Z", this, slot, num);
+	}
 };
 struct Actor {
 	// 获取生物名称信息
@@ -194,11 +187,11 @@ struct Actor {
 	int getMaxHealth() {
 		return SYMCALL<int>("?getMaxHealth@Actor@@QEBAHXZ", this);
 	}
-	void setHealth(float value, float max) {
+	void setHealth(int value, int max) {
 		VA hattr = ((*(VA(__fastcall**)(Actor*, void*))(*(VA*)this + 1552))(
 			this, SYM("?HEALTH@SharedAttributes@@2VAttribute@@B")));
-		f(float, hattr + 132) = value;
-		f(float, hattr + 128) = max;
+		f(int, hattr + 132) = value;
+		f(int, hattr + 128) = max;
 		//SYMCALL("?_setDirty@AttributeInstance@@AEAAXXZ", hattr);
 	}
 };

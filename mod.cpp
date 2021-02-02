@@ -21,10 +21,17 @@ static int _Damage;//伤害值
 static unordered_map<PyObject*, pair<unsigned, unsigned>> tick;//执行队列
 #pragma endregion
 #pragma region 函数定义
-static Json toJson(const char* s) {
-	Json j;
-	j.fromString(s);
-	return static_cast<Json&&>(j);
+static Json::Value toJson(const string& s) {
+	Json::Value j;
+	Json::CharReaderBuilder rb;
+	string errs;
+	Json::CharReader* r(rb.newCharReader());
+	bool res = r->parse(s.c_str(), s.c_str() + s.length(), &j, &errs);
+	if (!res || !errs.empty()) {
+		cerr << u8"[Jsoncpp]" << errs << endl;
+	}
+	delete r;
+	return move(j);
 }
 static bool isUTF8(const char* str) {
 	unsigned int nBytes = 0;//UFT8可用1-6个字节编码,ASCII用一个字节  
@@ -89,6 +96,36 @@ static inline VA createPacket(char type) {
 	SYMCALL<VA>("?createPacket@MinecraftPackets@@SA?AV?$shared_ptr@VPacket@@@std@@W4MinecraftPacketIds@@@Z",
 		&pkt, type);
 	return pkt;
+}
+static char stoe(const string& s) {
+	if (s == u8"后台输入")return 0;
+	else if (s == u8"后台输出")return 1;
+	else if (s == u8"选择表单")return 2;
+	else if (s == u8"使用物品")return 3;
+	else if (s == u8"放置方块")return 4;
+	else if (s == u8"破坏方块")return 5;
+	else if (s == u8"打开箱子")return 6;
+	else if (s == u8"打开木桶")return 7;
+	else if (s == u8"关闭箱子")return 8;
+	else if (s == u8"关闭木桶")return 9;
+	else if (s == u8"放入取出")return 10;
+	else if (s == u8"切换维度")return 11;
+	else if (s == u8"生物死亡")return 12;
+	else if (s == u8"生物受伤")return 13;
+	else if (s == u8"玩家重生")return 14;
+	else if (s == u8"聊天消息")return 15;
+	else if (s == u8"输入文本")return 16;
+	else if (s == u8"更新命令方块")return 17;
+	else if (s == u8"输入指令")return 18;
+	else if (s == u8"命令方块执行")return 19;
+	else if (s == u8"加入游戏")return 20;
+	else if (s == u8"离开游戏")return 21;
+	else if (s == u8"玩家攻击")return 22;
+	else if (s == u8"世界爆炸")return 23;
+	else if (s == u8"玩家穿戴")return 24;
+	else if (s == u8"耕地破坏")return 25;
+	else if (s == u8"使用重生锚")return 26;
+	else return-1;
 }
 static bool callpy(const char* type, PyObject* val) {
 	bool result = true;
@@ -218,11 +255,14 @@ api_function(removeTimer) {
 }
 // 设置监听
 api_function(setListener) {
-	const char* m;
-	PyObject* func;
-	if (PyArg_ParseTuple(args, "sO:setListener", &m, &func) && PyCallable_Check(func)) {
-		PyFuncs[m].push_back(func);
-		return Py_True;
+	const char* e; PyObject* fn;
+	if (PyArg_ParseTuple(args, "sO:setListener", &e, &fn)) {
+		char event = stoe(e);
+		if (event != -1) {
+			PyFuncs[e].push_back(fn);
+			return Py_True;
+		}
+		else cout << u8"无效的监听:" << e << endl;
 	}
 	return Py_False;
 }
@@ -316,7 +356,8 @@ api_function(getPlayerInfo) {
 api_function(getActorInfo) {
 	Actor* a;
 	if (PyArg_ParseTuple(args, "K:getActorInfo", &a)) {
-		assert(a);
+		if (!a)
+			return Py_False;
 		Vec3* pp = a->getPos();
 		return Py_BuildValue("{s:s,s:[f,f,f],s:i,s:b,s:i,s:i}",
 			"entityname", a->getEntityTypeName().c_str(),
@@ -327,7 +368,7 @@ api_function(getActorInfo) {
 			"maxhealth", a->getMaxHealth()
 		);
 	}
-	return PyDict_New();
+	return Py_False;
 }
 // 玩家权限
 api_function(getPlayerPerm) {
@@ -518,7 +559,7 @@ api_function(getPlayerItems) {
 	Player* p;
 	if (PyArg_ParseTuple(args, "K:getPlayerItems", &p)) {
 		if (PlayerCheck(p)) {
-			Json j;
+			Json::Value j;
 			for (auto& i : p->getContainer()->getSlots()) {
 				j.append(toJson(i->save()));
 			}
@@ -555,10 +596,10 @@ api_function(setPlayerItems) {
 	const char* x;
 	if (PyArg_ParseTuple(args, "Ks:setPlayerItems", &p, &x)) {
 		if (PlayerCheck(p)) {
-			Json j = toJson(x);
-			if (j.getType() == Json::_array) {
+			Json::Value j = toJson(x);
+			if (j.isArray()) {
 				vector<ItemStack*> is = p->getContainer()->getSlots();
-				for (unsigned i = 0; i < j.asArray().size(); i++) {
+				for (unsigned i = 0; i < j.size(); i++) {
 					Tag* t = toTag(j[i]);
 					is[i]->fromTag(t);
 					delete t;
@@ -575,10 +616,10 @@ api_function(setPlayerEnderChests) {
 	const char* x;
 	if (PyArg_ParseTuple(args, "Ks:setPlayerEnderChests", &p, &x)) {
 		if (PlayerCheck(p)) {
-			Json j = toJson(x);
-			if (j.getType() == Json::_array) {
+			Json::Value j = toJson(x);
+			if (j.isArray()) {
 				vector<ItemStack*> is = p->getEnderChestContainer()->getSlots();
-				for (unsigned i = 0; i < j.asArray().size(); i++) {
+				for (unsigned i = 0; i < j.size(); i++) {
 					Tag* t = toTag(j[i]);
 					is[i]->fromTag(t);
 					delete t;
@@ -590,6 +631,17 @@ api_function(setPlayerEnderChests) {
 	}
 	return Py_False;
 }
+// 移除物品
+api_function(removeItem) {
+	Player* p; int slot, num;
+	if (PyArg_ParseTuple(args, "Kii:removeItem", &p, &slot, &num)) {
+		if (PlayerCheck(p)) {
+			p->getContainer()->clearItem(slot, num);
+			p->sendInventroy();
+		}
+	}
+	return Py_None;
+}
 // 设置玩家侧边栏
 api_function(setSidebar) {
 	Player* p;
@@ -597,13 +649,13 @@ api_function(setSidebar) {
 	const char* data;
 	if (PyArg_ParseTuple(args, "Kss:setSidebar", &p, &title, &data)) {
 		if (PlayerCheck(p)) {
-			Json j = toJson(data);
+			Json::Value j = toJson(data);
 			setDisplayObjectivePacket(p, title);
-			if (j.getType() == Json::_object) {
+			if (j.isObject()) {
 				vector<ScorePacketInfo> info;
-				for (auto& x : j.asObject()) {
-					ScorePacketInfo o(_scoreboard->createScoreBoardId(x.first),
-						x.second.asInt(), x.first);
+				for (auto& x : j.getMemberNames()) {
+					ScorePacketInfo o(_scoreboard->createScoreBoardId(x),
+						j[x].asInt(), x);
 					info.push_back(o);
 				}
 				SetScorePacket(p, 0, info);
@@ -622,6 +674,7 @@ api_function(removeSidebar) {
 	}
 	return Py_None;
 }
+
 PyMethodDef api_list[] = {
 api_method(logout),
 api_method(runcmd),
@@ -660,6 +713,7 @@ api_method(getPlayerHand),
 api_method(getPlayerItem),
 api_method(setPlayerItems),
 api_method(setPlayerEnderChests),
+api_method(removeItem),
 api_method(setSidebar),
 api_method(removeSidebar),
 {}
@@ -724,13 +778,13 @@ Hook(后台输入, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@
 	VA _this, string& cmd) {
 	if (!isUTF8(cmd.c_str()))
 		return 0;
-	bool res = callpy(u8"后台输入", PyUnicode_FromString(cmd.c_str()));
+	bool res = callpy(u8"后台输入", PyBytes_FromString(cmd.c_str()));
 	check_ret(_this, cmd);
 }
-Hook(玩家加入, VA, "?onPlayerJoined@ServerScoreboard@@UEAAXAEBVPlayer@@@Z",
+Hook(加入游戏, VA, "?onPlayerJoined@ServerScoreboard@@UEAAXAEBVPlayer@@@Z",
 	VA a1, Player* p) {
 	PlayerList[p] = true;
-	callpy(u8"玩家加入", PyLong_FromUnsignedLongLong((VA)p));
+	callpy(u8"加入游戏", PyLong_FromUnsignedLongLong((VA)p));
 	return original(a1, p);
 }
 Hook(离开游戏, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer@@_N@Z",
@@ -742,7 +796,6 @@ Hook(离开游戏, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer
 Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EAEBVVec3@@PEBVBlock@@@Z",
 	VA _this, ItemStack* item, BlockPos* bp, unsigned __int8 a4, VA v5, Block* b) {
 	Player* p = f(Player*, _this + 8);
-	//TextPacket(p, 0, toJson(item->save()).toStyledString());
 	short iid = item->getId();
 	short iaux = item->mAuxValue;
 	string iname = item->getName();
@@ -875,7 +928,7 @@ Hook(生物死亡, void, "?die@Mob@@UEAAXAEBVActorDamageSource@@@Z",
 	char v72;
 	Actor* sa = SYMCALL<Actor*>("?fetchEntity@Level@@QEBAPEAVActor@@UActorUniqueID@@_N@Z",
 		f(VA, _this + 856), *(VA*)((*(VA(__fastcall**)(VA, char*))(*(VA*)dmsg + 64))(dmsg, &v72)), 0);
-	bool res = callpy(u8"生物死亡", Py_BuildValue("{s:i,s:K,s:K}",
+	bool res = callpy(u8"生物死亡", Py_BuildValue("{s:I,s:K,s:K}",
 		"dmcase", f(unsigned, dmsg + 8),
 		"actor1", _this,
 		"actor2", sa//可能为0
@@ -1094,12 +1147,12 @@ int DllMain(VA, int dwReason, VA) {
 				//pts[name] = (VA)Py_NewInterpreter();
 				FILE* file = fopen(((string)"./py/" + Info.name).c_str(), "rb");
 				auto in = Py_NewInterpreter();
-				printf("[BDSpyrunner] reading %s.\n", Info.name);
+				printf(u8"[BDSpyrunner] 读取 %s.\n", Info.name);
 				PyRun_SimpleFileExFlags(file, Info.name, 1, 0);
 			} while (!_findnext(handle, &Info));
 		}
 		_findclose(handle);
-		puts("[BDSpyrunner] v0.1.7 for BDS1.16.201 loaded.");
+		puts(u8"[BDSpyrunner] 已装载，版本0.2.0，本插件使用GPL3.0开源，请遵守协议");
 	}
 	return 1;
 }
