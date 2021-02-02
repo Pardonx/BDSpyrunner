@@ -105,6 +105,12 @@ struct Tag {
 		SYMCALL("??1ListTag@@UEAA@XZ", this);
 	}
 };
+Tag* newListTag() {
+	Tag* t = 0;
+	SYMCALL("??$make_unique@VListTag@@$$V$0A@@std@@YA?AV?$unique_ptr@VListTag@@U?$default_delete@VListTag@@@std@@@0@XZ",
+		&t);
+	return t;
+}
 struct CompoundTagVariant {
 	int type() {
 		return *((char*)this + 40);

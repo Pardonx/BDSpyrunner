@@ -1,45 +1,45 @@
-#include "pch.h"
+ï»¿#include "pch.h"
 #include "BDS.hpp"
 #pragma warning(disable:4996)
-#pragma region ºê¶¨Òå
+#pragma region ï¿½ê¶¨ï¿½ï¿½
 #define api_method(name) {#name, api_##name, 1, 0}
 #define api_function(name) static PyObject* api_##name(PyObject*, PyObject*args)
 #define check_ret(...) if (!res) return 0;return original(__VA_ARGS__)
 #define PlayerCheck(ptr)  PlayerList[(Player*)ptr]
 //#define createPacket(pkt, i) SYMCALL("?createPacket@MinecraftPackets@@SA?AV?$shared_ptr@VPacket@@@std@@W4MinecraftPacketIds@@@Z",pkt,i);
 #pragma endregion
-#pragma region È«¾Ö±äÁ¿
+#pragma region È«ï¿½Ö±ï¿½ï¿½ï¿½
 static VA _cmdqueue, _level, _ServerNetworkHandle;
 static const VA STD_COUT_HANDLE = f(VA, SYM("__imp_?cout@std@@3V?$basic_ostream@DU?$char_traits@D@std@@@1@A"));
-static Scoreboard* _scoreboard;//´¢´æ¼Æ·Ö°åÃû³Æ
-static unsigned _formid = 1;//±íµ¥ID
-static unordered_map<string, vector<PyObject*>> PyFuncs;//Pyº¯Êý
-static unordered_map<Player*, bool> PlayerList;//Íæ¼ÒÁÐ±í
-static vector<pair<string, string>> Command;//×¢²áÃüÁî
-static unordered_map<string, PyObject*> ShareData;//¹²ÏíÊý¾Ý
-static int _Damage;//ÉËº¦Öµ
-static unordered_map<PyObject*, pair<unsigned, unsigned>> tick;//Ö´ÐÐ¶ÓÁÐ
+static Scoreboard* _scoreboard;//ï¿½ï¿½ï¿½ï¿½Æ·Ö°ï¿½ï¿½ï¿½ï¿½ï¿½
+static unsigned _formid = 1;//ï¿½ï¿½ï¿½ID
+static unordered_map<string, vector<PyObject*>> PyFuncs;//Pyï¿½ï¿½ï¿½ï¿½
+static unordered_map<Player*, bool> PlayerList;//ï¿½ï¿½ï¿½ï¿½Ð±ï¿½
+static vector<pair<string, string>> Command;//×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+static unordered_map<string, PyObject*> ShareData;//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+static int _Damage;//ï¿½Ëºï¿½Öµ
+static unordered_map<PyObject*, pair<unsigned, unsigned>> tick;//Ö´ï¿½Ð¶ï¿½ï¿½ï¿½
 #pragma endregion
-#pragma region º¯Êý¶¨Òå
+#pragma region ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 static Json toJson(const char* s) {
 	Json j;
 	j.fromString(s);
 	return static_cast<Json&&>(j);
 }
 static bool isUTF8(const char* str) {
-	unsigned int nBytes = 0;//UFT8¿ÉÓÃ1-6¸ö×Ö½Ú±àÂë,ASCIIÓÃÒ»¸ö×Ö½Ú  
+	unsigned int nBytes = 0;//UFT8ï¿½ï¿½ï¿½ï¿½1-6ï¿½ï¿½ï¿½Ö½Ú±ï¿½ï¿½ï¿½,ASCIIï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ö½ï¿½  
 	unsigned char chr = *str;
 	bool bAllAscii = true;
 
 	for (unsigned int i = 0; str[i] != '\0'; ++i) {
 		chr = *(str + i);
-		//ÅÐ¶ÏÊÇ·ñASCII±àÂë,Èç¹û²»ÊÇ,ËµÃ÷ÓÐ¿ÉÄÜÊÇUTF8,ASCIIÓÃ7Î»±àÂë,×î¸ßÎ»±ê¼ÇÎª0,0xxxxxxx 
+		//ï¿½Ð¶ï¿½ï¿½Ç·ï¿½ASCIIï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,Ëµï¿½ï¿½ï¿½Ð¿ï¿½ï¿½ï¿½ï¿½ï¿½UTF8,ASCIIï¿½ï¿½7Î»ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½Îª0,0xxxxxxx 
 		if (nBytes == 0 && (chr & 0x80) != 0) {
 			bAllAscii = false;
 		}
 
 		if (nBytes == 0) {
-			//Èç¹û²»ÊÇASCIIÂë,Ó¦¸ÃÊÇ¶à×Ö½Ú·û,¼ÆËã×Ö½ÚÊý  
+			//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ASCIIï¿½ï¿½,Ó¦ï¿½ï¿½ï¿½Ç¶ï¿½ï¿½Ö½Ú·ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½  
 			if (chr >= 0x80) {
 
 				if (chr >= 0xFC && chr <= 0xFD) {
@@ -65,21 +65,21 @@ static bool isUTF8(const char* str) {
 			}
 		}
 		else {
-			//¶à×Ö½Ú·ûµÄ·ÇÊ××Ö½Ú,Ó¦Îª 10xxxxxx 
+			//ï¿½ï¿½ï¿½Ö½Ú·ï¿½ï¿½Ä·ï¿½ï¿½ï¿½ï¿½Ö½ï¿½,Ó¦Îª 10xxxxxx 
 			if ((chr & 0xC0) != 0x80) {
 				return false;
 			}
-			//¼õµ½ÎªÁãÎªÖ¹
+			//ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ÎªÖ¹
 			nBytes--;
 		}
 	}
 
-	//Î¥·µUTF8±àÂë¹æÔò 
+	//Î¥ï¿½ï¿½UTF8ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 
 	if (nBytes != 0) {
 		return false;
 	}
 
-	if (bAllAscii) { //Èç¹ûÈ«²¿¶¼ÊÇASCII, Ò²ÊÇUTF8
+	if (bAllAscii) { //ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ASCII, Ò²ï¿½ï¿½UTF8
 		return true;
 	}
 	return true;
@@ -146,7 +146,7 @@ static bool BossEventPacket(Player* p, string name, float per, int eventtype) {
 	if (PlayerCheck(p)) {
 		VA pkt = createPacket(74);
 		f(VA, pkt + 48) = f(VA, pkt + 56) = f(VA, p->getUniqueID());
-		f(int, pkt + 64) = eventtype;//0ÏÔÊ¾,1¸üÐÂ,2Òþ²Ø,
+		f(int, pkt + 64) = eventtype;//0ï¿½ï¿½Ê¾,1ï¿½ï¿½ï¿½ï¿½,2ï¿½ï¿½ï¿½ï¿½,
 		f(string, pkt + 72) = name;
 		f(float, pkt + 104) = per;
 		p->sendPacket(pkt);
@@ -178,8 +178,8 @@ static bool SetScorePacket(Player* p, char type, const vector<ScorePacketInfo>& 
 	return false;
 }
 #pragma endregion
-#pragma region APIº¯Êý
-// Ö¸ÁîÊä³ö
+#pragma region APIï¿½ï¿½ï¿½ï¿½
+// Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½
 api_function(logout) {
 	const char* msg;
 	if (PyArg_ParseTuple(args, "s:logout", &msg)) {
@@ -189,7 +189,7 @@ api_function(logout) {
 	}
 	return Py_False;
 }
-// Ö´ÐÐÖ¸Áî
+// Ö´ï¿½ï¿½Ö¸ï¿½ï¿½
 api_function(runcmd) {
 	const char* cmd;
 	if (PyArg_ParseTuple(args, "s:runcmd", &cmd)) {
@@ -199,7 +199,7 @@ api_function(runcmd) {
 	}
 	return Py_False;
 }
-// ¼ÆÊ±Æ÷
+// ï¿½ï¿½Ê±ï¿½ï¿½
 api_function(setTimer) {
 	unsigned time; PyObject* func;
 	if (PyArg_ParseTuple(args, "OI:setTimer", &func, &time)) {
@@ -216,7 +216,7 @@ api_function(removeTimer) {
 	}
 	return Py_True;
 }
-// ÉèÖÃ¼àÌý
+// ï¿½ï¿½ï¿½Ã¼ï¿½ï¿½ï¿½
 api_function(setListener) {
 	const char* m;
 	PyObject* func;
@@ -226,7 +226,7 @@ api_function(setListener) {
 	}
 	return Py_False;
 }
-// ¹²ÏíÊý¾Ý
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 api_function(setShareData) {
 	const char* index; PyObject* data;
 	if (PyArg_ParseTuple(args, "sO:setShareData", &index, &data)) {
@@ -242,7 +242,7 @@ api_function(getShareData) {
 	}
 	return Py_False;
 }
-// ÉèÖÃÖ¸ÁîËµÃ÷
+// ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½Ëµï¿½ï¿½
 api_function(setCommandDescription) {
 	const char* cmd, * des;
 	if (PyArg_ParseTuple(args, "ss:setCommandDescribe", &cmd, &des)) {
@@ -259,7 +259,7 @@ api_function(getPlayerList) {
 	}
 	return list;
 }
-// ·¢ËÍ±íµ¥
+// ï¿½ï¿½ï¿½Í±ï¿½ï¿½
 api_function(sendCustomForm) {
 	Player* p; const char* str;
 	if (PyArg_ParseTuple(args, "Ks:sendCustomForm", &p, &str)) {
@@ -285,7 +285,7 @@ api_function(sendModalForm) {
 	}
 	return Py_False;
 }
-// ¿ç·þ´«ËÍ
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 api_function(transferServer) {
 	Player* p; const char* address; int port;
 	if (PyArg_ParseTuple(args, "Ksi:transferServer", &p, &address, &port)) {
@@ -294,7 +294,7 @@ api_function(transferServer) {
 	}
 	return Py_False;
 }
-// »ñÈ¡Íæ¼ÒÐÅÏ¢
+// ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
 api_function(getPlayerInfo) {
 	Player* p;
 	if (PyArg_ParseTuple(args, "K:getPlayerInfo", &p)) {
@@ -329,7 +329,7 @@ api_function(getActorInfo) {
 	}
 	return PyDict_New();
 }
-// Íæ¼ÒÈ¨ÏÞ
+// ï¿½ï¿½ï¿½È¨ï¿½ï¿½
 api_function(getPlayerPerm) {
 	Player* p;
 	if (PyArg_ParseTuple(args, "K:getPlayerPerm", &p)) {
@@ -349,7 +349,7 @@ api_function(setPlayerPerm) {
 	}
 	return Py_False;
 }
-// Ôö¼ÓÍæ¼ÒµÈ¼¶
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÒµÈ¼ï¿½
 api_function(addLevel) {
 	Player* p; int lv;
 	if (PyArg_ParseTuple(args, "Ki::addLevel", &p, &lv)) {
@@ -360,7 +360,7 @@ api_function(addLevel) {
 	}
 	return Py_False;
 }
-// ÉèÖÃÍæ¼ÒÃû×Ö
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 api_function(setName) {
 	Player* p; const char* name;
 	if (PyArg_ParseTuple(args, "Ks:setName", &p, &name)) {
@@ -371,7 +371,7 @@ api_function(setName) {
 	}
 	return Py_False;
 }
-// Íæ¼Ò·ÖÊý
+// ï¿½ï¿½Ò·ï¿½ï¿½ï¿½
 api_function(getPlayerScore) {
 	Player* p; const char* obj;
 	if (PyArg_ParseTuple(args, "Ks:getPlayerScore", &p, &obj)) {
@@ -402,7 +402,7 @@ api_function(modifyPlayerScore) {
 	}
 	return Py_False;
 }
-// Ä£ÄâÍæ¼Ò·¢ËÍÎÄ±¾
+// Ä£ï¿½ï¿½ï¿½ï¿½Ò·ï¿½ï¿½ï¿½ï¿½Ä±ï¿½
 api_function(talkAs) {
 	Player* p; const char* msg;
 	if (PyArg_ParseTuple(args, "Ks:talkAs", &p, &msg)) {
@@ -411,7 +411,7 @@ api_function(talkAs) {
 	}
 	return Py_False;
 }
-// Ä£ÄâÍæ¼ÒÖ´ÐÐÖ¸Áî
+// Ä£ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½Ö¸ï¿½ï¿½
 api_function(runcmdAs) {
 	Player* p; const char* cmd;
 	if (PyArg_ParseTuple(args, "Ks:runcmdAs", &p, &cmd)) {
@@ -420,7 +420,7 @@ api_function(runcmdAs) {
 	}
 	return Py_False;
 }
-// ´«ËÍÍæ¼Ò
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 api_function(teleport) {
 	Player* p; float x, y, z; int did;
 	if (PyArg_ParseTuple(args, "Kfffi:teleport", &p, &x, &y, &z, &did)) {
@@ -429,7 +429,7 @@ api_function(teleport) {
 	}
 	return Py_False;
 }
-// Ô­Ê¼Êä³ö
+// Ô­Ê¼ï¿½ï¿½ï¿½
 api_function(tellraw) {
 	const char* msg;
 	Player* p;
@@ -439,7 +439,7 @@ api_function(tellraw) {
 	}
 	return Py_False;
 }
-// bossÀ¸
+// bossï¿½ï¿½
 api_function(setBossBar) {
 	Player* p; const char* name; float per;
 	if (PyArg_ParseTuple(args, "Ksf:", &p, &name, &per)) {
@@ -456,7 +456,7 @@ api_function(removeBossBar) {
 	}
 	return Py_False;
 }
-//Í¨¹ýÍæ¼ÒÖ¸Õë»ñÈ¡¼Æ·Ö°åid
+//Í¨ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½È¡ï¿½Æ·Ö°ï¿½id
 api_function(getScoreBoardId) {
 	Player* p;
 	if (PyArg_ParseTuple(args, "K:getScoreBoardId", &p)) {
@@ -478,7 +478,7 @@ api_function(createScoreBoardId) {
 	}
 	return Py_False;
 }
-//ÐÞ¸ÄÉúÎïÊÜÉËµÄÉËº¦Öµ!
+//ï¿½Þ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëµï¿½ï¿½Ëºï¿½Öµ!
 api_function(setDamage) {
 	int a;
 	if (PyArg_ParseTuple(args, "i:setDamage", &a)) {
@@ -497,7 +497,7 @@ api_function(setServerMotd) {
 	}
 	return Py_False;
 }
-// Ôö¼ÓÒ»¸öÎïÆ·
+// ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Æ·
 api_function(addItemEx) {
 	Player* p;
 	const char* x;
@@ -527,7 +527,7 @@ api_function(getPlayerItems) {
 	}
 	return Py_False;
 }
-// »ñÈ¡Íæ¼ÒÊÖ³Ö
+// ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½Ö³ï¿½
 api_function(getPlayerHand) {
 	Player* p;
 	if (PyArg_ParseTuple(args, "K:getPlayerHand", &p)) {
@@ -538,7 +538,7 @@ api_function(getPlayerHand) {
 	}
 	return Py_False;
 }
-// »ñÈ¡Íæ¼Ò±³°üÎïÆ·
+// ï¿½ï¿½È¡ï¿½ï¿½Ò±ï¿½ï¿½ï¿½ï¿½ï¿½Æ·
 api_function(getPlayerItem) {
 	Player* p; int slot;
 	if (PyArg_ParseTuple(args, "Ki:getPlayerItem", &p, &slot)) {
@@ -549,7 +549,7 @@ api_function(getPlayerItem) {
 	}
 	return Py_False;
 }
-// ÉèÖÃÍæ¼Ò±³°üÄ©Ó°Ïä
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò±ï¿½ï¿½ï¿½Ä©Ó°ï¿½ï¿½
 api_function(setPlayerItems) {
 	Player* p;
 	const char* x;
@@ -590,7 +590,7 @@ api_function(setPlayerEnderChests) {
 	}
 	return Py_False;
 }
-// ÉèÖÃÍæ¼Ò²à±ßÀ¸
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½
 api_function(setSidebar) {
 	Player* p;
 	const char* title;
@@ -664,14 +664,14 @@ api_method(setSidebar),
 api_method(removeSidebar),
 {}
 };
-// Ä£¿éÉùÃ÷
+// Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 PyModuleDef api_module = { PyModuleDef_HEAD_INIT, "mc", 0, -1, api_list, 0, 0, 0, 0 };
 extern "C" PyObject * mc_init() {
 	return PyModule_Create(&api_module);
 }
 #pragma endregion
 #pragma region Hook
-Hook(ÊÀ½çTick, void, "?tick@Level@@UEAAXXZ",
+Hook(ï¿½ï¿½ï¿½ï¿½Tick, void, "?tick@Level@@UEAAXXZ",
 	VA a1, VA a2, VA a3, VA a4) {
 	original(a1, a2, a3, a4);
 	if (tick.empty())
@@ -684,22 +684,22 @@ Hook(ÊÀ½çTick, void, "?tick@Level@@UEAAXXZ",
 		else i.second.first--;
 	}
 }
-Hook(»ñÈ¡Ö¸Áî¶ÓÁÐ, VA, "??0?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@QEAA@_K@Z",
+Hook(ï¿½ï¿½È¡Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½, VA, "??0?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@QEAA@_K@Z",
 	VA _this) {
 	_cmdqueue = original(_this);
 	return _cmdqueue;
 }
-Hook(»ñÈ¡µØÍ¼³õÊ¼»¯ÐÅÏ¢, VA, "??0Level@@QEAA@AEBV?$not_null@V?$NonOwnerPointer@VSoundPlayerInterface@@@Bedrock@@@gsl@@V?$unique_ptr@VLevelStorage@@U?$default_delete@VLevelStorage@@@std@@@std@@V?$unique_ptr@VLevelLooseFileStorage@@U?$default_delete@VLevelLooseFileStorage@@@std@@@4@AEAVIMinecraftEventing@@_NEAEAVScheduler@@AEAVStructureManager@@AEAVResourcePackManager@@AEAVIEntityRegistryOwner@@V?$unique_ptr@VBlockComponentFactory@@U?$default_delete@VBlockComponentFactory@@@std@@@4@V?$unique_ptr@VBlockDefinitionGroup@@U?$default_delete@VBlockDefinitionGroup@@@std@@@4@@Z",
+Hook(ï¿½ï¿½È¡ï¿½ï¿½Í¼ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ï¢, VA, "??0Level@@QEAA@AEBV?$not_null@V?$NonOwnerPointer@VSoundPlayerInterface@@@Bedrock@@@gsl@@V?$unique_ptr@VLevelStorage@@U?$default_delete@VLevelStorage@@@std@@@std@@V?$unique_ptr@VLevelLooseFileStorage@@U?$default_delete@VLevelLooseFileStorage@@@std@@@4@AEAVIMinecraftEventing@@_NEAEAVScheduler@@AEAVStructureManager@@AEAVResourcePackManager@@AEAVIEntityRegistryOwner@@V?$unique_ptr@VBlockComponentFactory@@U?$default_delete@VBlockComponentFactory@@@std@@@4@V?$unique_ptr@VBlockDefinitionGroup@@U?$default_delete@VBlockDefinitionGroup@@@std@@@4@@Z",
 	VA a1, VA a2, VA a3, VA a4, VA a5, VA a6, VA a7, VA a8, VA a9, VA a10, VA a11, VA a12, VA a13) {
 	_level = original(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
 	return _level;
 }
-Hook(»ñÈ¡ÓÎÏ·³õÊ¼»¯ÐÅÏ¢, VA, "??0GameSession@@QEAA@AEAVNetworkHandler@@V?$unique_ptr@VServerNetworkHandler@@U?$default_delete@VServerNetworkHandler@@@std@@@std@@AEAVLoopbackPacketSender@@V?$unique_ptr@VNetEventCallback@@U?$default_delete@VNetEventCallback@@@std@@@3@V?$unique_ptr@VLevel@@U?$default_delete@VLevel@@@std@@@3@E@Z",
+Hook(ï¿½ï¿½È¡ï¿½ï¿½Ï·ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ï¢, VA, "??0GameSession@@QEAA@AEAVNetworkHandler@@V?$unique_ptr@VServerNetworkHandler@@U?$default_delete@VServerNetworkHandler@@@std@@@std@@AEAVLoopbackPacketSender@@V?$unique_ptr@VNetEventCallback@@U?$default_delete@VNetEventCallback@@@std@@@3@V?$unique_ptr@VLevel@@U?$default_delete@VLevel@@@std@@@3@E@Z",
 	VA a1, VA a2, VA a3, VA a4, VA a5, VA a6, VA a7) {
 	_ServerNetworkHandle = f(VA, a3);
 	return original(a1, a2, a3, a4, a5, a6, a7);
 }
-Hook(ÃüÁî×¢²á, void, "?setup@ChangeSettingCommand@@SAXAEAVCommandRegistry@@@Z",//"?setup@ChangeSettingCommand@@SAXAEAVCommandRegistry@@@Z",?setup@KillCommand@@SAXAEAVCommandRegistry@@@Z
+Hook(ï¿½ï¿½ï¿½ï¿½×¢ï¿½ï¿½, void, "?setup@ChangeSettingCommand@@SAXAEAVCommandRegistry@@@Z",//"?setup@ChangeSettingCommand@@SAXAEAVCommandRegistry@@@Z",?setup@KillCommand@@SAXAEAVCommandRegistry@@@Z
 	VA _this) {
 	for (auto& cmd : Command) {
 		SYMCALL("?registerCommand@CommandRegistry@@QEAAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PEBDW4CommandPermissionLevel@@UCommandFlag@@3@Z",
@@ -707,39 +707,39 @@ Hook(ÃüÁî×¢²á, void, "?setup@ChangeSettingCommand@@SAXAEAVCommandRegistry@@@Z",/
 	}
 	original(_this);
 }
-Hook(¼Æ·Ö°å, Scoreboard*, "??0ServerScoreboard@@QEAA@VCommandSoftEnumRegistry@@PEAVLevelStorage@@@Z",
+Hook(ï¿½Æ·Ö°ï¿½, Scoreboard*, "??0ServerScoreboard@@QEAA@VCommandSoftEnumRegistry@@PEAVLevelStorage@@@Z",
 	VA _this, VA a2, VA a3) {
 	_scoreboard = (Scoreboard*)original(_this, a2, a3);
 	return _scoreboard;
 }
-Hook(ºóÌ¨Êä³ö, VA, "??$_Insert_string@DU?$char_traits@D@std@@_K@std@@YAAEAV?$basic_ostream@DU?$char_traits@D@std@@@0@AEAV10@QEBD_K@Z",
+Hook(ï¿½ï¿½Ì¨ï¿½ï¿½ï¿½, VA, "??$_Insert_string@DU?$char_traits@D@std@@_K@std@@YAAEAV?$basic_ostream@DU?$char_traits@D@std@@@0@AEAV10@QEBD_K@Z",
 	VA handle, const char* str, VA size) {
 	if (handle == STD_COUT_HANDLE) {
-		bool res = callpy(u8"ºóÌ¨Êä³ö", PyUnicode_FromString(str));
+		bool res = callpy(u8"ï¿½ï¿½Ì¨ï¿½ï¿½ï¿½", PyUnicode_FromString(str));
 		if (!res)return 0;
 	}
 	return original(handle, str, size);
 }
-Hook(ºóÌ¨ÊäÈë, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@AEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
+Hook(ï¿½ï¿½Ì¨ï¿½ï¿½ï¿½ï¿½, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@AEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
 	VA _this, string& cmd) {
 	if (!isUTF8(cmd.c_str()))
 		return 0;
-	bool res = callpy(u8"ºóÌ¨ÊäÈë", PyUnicode_FromString(cmd.c_str()));
+	bool res = callpy(u8"ï¿½ï¿½Ì¨ï¿½ï¿½ï¿½ï¿½", PyUnicode_FromString(cmd.c_str()));
 	check_ret(_this, cmd);
 }
-Hook(Íæ¼Ò¼ÓÈë, VA, "?onPlayerJoined@ServerScoreboard@@UEAAXAEBVPlayer@@@Z",
+Hook(ï¿½ï¿½Ò¼ï¿½ï¿½ï¿½, VA, "?onPlayerJoined@ServerScoreboard@@UEAAXAEBVPlayer@@@Z",
 	VA a1, Player* p) {
 	PlayerList[p] = true;
-	callpy(u8"Íæ¼Ò¼ÓÈë", PyLong_FromUnsignedLongLong((VA)p));
+	callpy(u8"ï¿½ï¿½Ò¼ï¿½ï¿½ï¿½", PyLong_FromUnsignedLongLong((VA)p));
 	return original(a1, p);
 }
-Hook(Àë¿ªÓÎÏ·, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer@@_N@Z",
+Hook(ï¿½ë¿ªï¿½ï¿½Ï·, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer@@_N@Z",
 	VA _this, Player* p, char v3) {
-	callpy(u8"Àë¿ªÓÎÏ·", PyLong_FromUnsignedLongLong((VA)p));
+	callpy(u8"ï¿½ë¿ªï¿½ï¿½Ï·", PyLong_FromUnsignedLongLong((VA)p));
 	PlayerList.erase(p);
 	return original(_this, p, v3);
 }
-Hook(Ê¹ÓÃÎïÆ·, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EAEBVVec3@@PEBVBlock@@@Z",
+Hook(Ê¹ï¿½ï¿½ï¿½ï¿½Æ·, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EAEBVVec3@@PEBVBlock@@@Z",
 	VA _this, ItemStack* item, BlockPos* bp, unsigned __int8 a4, VA v5, Block* b) {
 	Player* p = f(Player*, _this + 8);
 	//TextPacket(p, 0, toJson(item->save()).toStyledString());
@@ -750,7 +750,7 @@ Hook(Ê¹ÓÃÎïÆ·, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EA
 	short bid = bl->getBlockItemID();
 	string bn = bl->getBlockName();
 	bool res = true;
-	res = callpy(u8"Ê¹ÓÃÎïÆ·", Py_BuildValue("{s:K,s:i,s:i,s:s,s:s,s:i,s:[i,i,i]}",
+	res = callpy(u8"Ê¹ï¿½ï¿½ï¿½ï¿½Æ·", Py_BuildValue("{s:K,s:i,s:i,s:s,s:s,s:i,s:[i,i,i]}",
 		"player", p,
 		"itemid", iid,
 		"itemaux", iaux,
@@ -761,14 +761,14 @@ Hook(Ê¹ÓÃÎïÆ·, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EA
 	));
 	check_ret(_this, item, bp, a4, v5, b);
 }
-Hook(·ÅÖÃ·½¿é, bool, "?mayPlace@BlockSource@@QEAA_NAEBVBlock@@AEBVBlockPos@@EPEAVActor@@_N@Z",
+Hook(ï¿½ï¿½ï¿½Ã·ï¿½ï¿½ï¿½, bool, "?mayPlace@BlockSource@@QEAA_NAEBVBlock@@AEBVBlockPos@@EPEAVActor@@_N@Z",
 	BlockSource* _this, Block* b, BlockPos* bp, unsigned __int8 a4, Actor* p, bool _bool) {
 	bool res = true;
 	if (PlayerCheck(p)) {
 		BlockLegacy* bl = b->getBlockLegacy();
 		short bid = bl->getBlockItemID();
 		string bn = bl->getBlockName();
-		res = callpy(u8"·ÅÖÃ·½¿é", Py_BuildValue("{s:K,s:s,s:i,s:[i,i,i]}",
+		res = callpy(u8"ï¿½ï¿½ï¿½Ã·ï¿½ï¿½ï¿½", Py_BuildValue("{s:K,s:s,s:i,s:[i,i,i]}",
 			"player", p,
 			"blockname", bn.c_str(),
 			"blockid", bid,
@@ -777,7 +777,7 @@ Hook(·ÅÖÃ·½¿é, bool, "?mayPlace@BlockSource@@QEAA_NAEBVBlock@@AEBVBlockPos@@EPEA
 	}
 	check_ret(_this, b, bp, a4, p, _bool);
 }
-Hook(ÆÆ»µ·½¿é, bool, "?_destroyBlockInternal@GameMode@@AEAA_NAEBVBlockPos@@E@Z",
+Hook(ï¿½Æ»ï¿½ï¿½ï¿½ï¿½ï¿½, bool, "?_destroyBlockInternal@GameMode@@AEAA_NAEBVBlockPos@@E@Z",
 	VA _this, BlockPos* bp) {
 	Player* p = f(Player*, _this + 8);
 	BlockSource* bs = f(BlockSource*, f(VA, _this + 8) + 840);
@@ -786,7 +786,7 @@ Hook(ÆÆ»µ·½¿é, bool, "?_destroyBlockInternal@GameMode@@AEAA_NAEBVBlockPos@@E@Z",
 	short bid = bl->getBlockItemID();
 	string bn = bl->getBlockName();
 	bool res = true;
-	res = callpy(u8"ÆÆ»µ·½¿é", Py_BuildValue("{s:K,s:s,s:i,s:[i,i,i]}",
+	res = callpy(u8"ï¿½Æ»ï¿½ï¿½ï¿½ï¿½ï¿½", Py_BuildValue("{s:K,s:s,s:i,s:[i,i,i]}",
 		"player", p,
 		"blockname", bn.c_str(),
 		"blockid", bid,
@@ -794,52 +794,52 @@ Hook(ÆÆ»µ·½¿é, bool, "?_destroyBlockInternal@GameMode@@AEAA_NAEBVBlockPos@@E@Z",
 	));
 	check_ret(_this, bp);
 }
-Hook(´ò¿ªÏä×Ó, bool, "?use@ChestBlock@@UEBA_NAEAVPlayer@@AEBVBlockPos@@E@Z",
+Hook(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, bool, "?use@ChestBlock@@UEBA_NAEAVPlayer@@AEBVBlockPos@@E@Z",
 	VA _this, Player* p, BlockPos* bp) {
-	bool res = callpy(u8"´ò¿ªÏä×Ó", Py_BuildValue("{s:K,s:[i,i,i]}",
+	bool res = callpy(u8"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½", Py_BuildValue("{s:K,s:[i,i,i]}",
 		"player", p,
 		"position", bp->x, bp->y, bp->z
 	));
 	check_ret(_this, p, bp);
 }
-Hook(´ò¿ªÄ¾Í°, bool, "?use@BarrelBlock@@UEBA_NAEAVPlayer@@AEBVBlockPos@@E@Z",
+Hook(ï¿½ï¿½Ä¾Í°, bool, "?use@BarrelBlock@@UEBA_NAEAVPlayer@@AEBVBlockPos@@E@Z",
 	VA _this, Player* p, BlockPos* bp) {
-	bool res = callpy(u8"´ò¿ªÄ¾Í°", Py_BuildValue("{s:K,s:[i,i,i]}",
+	bool res = callpy(u8"ï¿½ï¿½Ä¾Í°", Py_BuildValue("{s:K,s:[i,i,i]}",
 		"player", p,
 		"position", bp->x, bp->y, bp->z
 	));
 	check_ret(_this, p, bp);
 }
-Hook(¹Ø±ÕÏä×Ó, void, "?stopOpen@ChestBlockActor@@UEAAXAEAVPlayer@@@Z",
+Hook(ï¿½Ø±ï¿½ï¿½ï¿½ï¿½ï¿½, void, "?stopOpen@ChestBlockActor@@UEAAXAEAVPlayer@@@Z",
 	VA _this, Player* p) {
 	auto bp = (BlockPos*)(_this - 204);
-	callpy(u8"¹Ø±ÕÏä×Ó", Py_BuildValue("{s:K,s:[i,i,i]}",
+	callpy(u8"ï¿½Ø±ï¿½ï¿½ï¿½ï¿½ï¿½", Py_BuildValue("{s:K,s:[i,i,i]}",
 		"player", p,
 		"position", bp->x, bp->y, bp->z
 	));
 	original(_this, p);
 }
-Hook(¹Ø±ÕÄ¾Í°, void, "?stopOpen@BarrelBlockActor@@UEAAXAEAVPlayer@@@Z",
+Hook(ï¿½Ø±ï¿½Ä¾Í°, void, "?stopOpen@BarrelBlockActor@@UEAAXAEAVPlayer@@@Z",
 	VA _this, Player* p) {
 	auto bp = (BlockPos*)(_this - 204);
-	callpy(u8"¹Ø±ÕÄ¾Í°", Py_BuildValue("{s:K,s:[i,i,i]}",
+	callpy(u8"ï¿½Ø±ï¿½Ä¾Í°", Py_BuildValue("{s:K,s:[i,i,i]}",
 		"player", p,
 		"position", bp->x, bp->y, bp->z
 	));
 	original(_this, p);
 }
-Hook(·ÅÈëÈ¡³ö, void, "?containerContentChanged@LevelContainerModel@@UEAAXH@Z",
+Hook(ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½, void, "?containerContentChanged@LevelContainerModel@@UEAAXH@Z",
 	VA a1, VA slot) {
 	VA v3 = f(VA, a1 + 208);// IDA LevelContainerModel::_getContainer line 15 25
 	BlockSource* bs = f(BlockSource*, f(VA, v3 + 848) + 88);
 	BlockPos* bp = (BlockPos*)(a1 + 216);
 	BlockLegacy* bl = bs->getBlock(bp)->getBlockLegacy();
 	short bid = bl->getBlockItemID();
-	if (bid == 54 || bid == 130 || bid == 146 || bid == -203 || bid == 205 || bid == 218) {	// ·ÇÏä×Ó¡¢Í°¡¢Ç±Ó°ºÐµÄÇé¿ö²»×÷´¦Àí
+	if (bid == 54 || bid == 130 || bid == 146 || bid == -203 || bid == 205 || bid == 218) {	// ï¿½ï¿½ï¿½ï¿½ï¿½Ó¡ï¿½Í°ï¿½ï¿½Ç±Ó°ï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		VA v5 = (*(VA(**)(VA))(*(VA*)a1 + 160))(a1);
 		if (v5) {
 			ItemStack* i = (ItemStack*)(*(VA(**)(VA, VA))(*(VA*)v5 + 40))(v5, slot);
-			callpy(u8"·ÅÈëÈ¡³ö", Py_BuildValue("{s:K,s:s,s:i,s:[i,i,i],s:i,s:i,s:s,s:i,s:i}",
+			callpy(u8"ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½", Py_BuildValue("{s:K,s:s,s:i,s:[i,i,i],s:i,s:i,s:s,s:i,s:i}",
 				"player", f(Player*, a1 + 208),
 				"blockname", bl->getBlockName().c_str(),
 				"blockid", bid,
@@ -854,56 +854,56 @@ Hook(·ÅÈëÈ¡³ö, void, "?containerContentChanged@LevelContainerModel@@UEAAXH@Z",
 	}
 	original(a1, slot);
 }
-Hook(Íæ¼Ò¹¥»÷, bool, "?attack@Player@@UEAA_NAEAVActor@@@Z",
+Hook(ï¿½ï¿½Ò¹ï¿½ï¿½ï¿½, bool, "?attack@Player@@UEAA_NAEAVActor@@@Z",
 	Player* p, Actor* a) {
-	bool res = callpy(u8"Íæ¼Ò¹¥»÷", Py_BuildValue("{s:K,s:K}",
+	bool res = callpy(u8"ï¿½ï¿½Ò¹ï¿½ï¿½ï¿½", Py_BuildValue("{s:K,s:K}",
 		"player", p,
 		"actor", a
 	));
 	check_ret(p, a);
 }
-Hook(ÇÐ»»Î¬¶È, bool, "?_playerChangeDimension@Level@@AEAA_NPEAVPlayer@@AEAVChangeDimensionRequest@@@Z",
+Hook(ï¿½Ð»ï¿½Î¬ï¿½ï¿½, bool, "?_playerChangeDimension@Level@@AEAA_NPEAVPlayer@@AEAVChangeDimensionRequest@@@Z",
 	VA _this, Player* p, VA req) {
 	bool result = original(_this, p, req);
 	if (result) {
-		callpy(u8"ÇÐ»»Î¬¶È", PyLong_FromUnsignedLongLong((VA)p));
+		callpy(u8"ï¿½Ð»ï¿½Î¬ï¿½ï¿½", PyLong_FromUnsignedLongLong((VA)p));
 	}
 	return result;
 }
-Hook(ÉúÎïËÀÍö, void, "?die@Mob@@UEAAXAEBVActorDamageSource@@@Z",
+Hook(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, void, "?die@Mob@@UEAAXAEBVActorDamageSource@@@Z",
 	Mob* _this, VA dmsg) {
 	char v72;
 	Actor* sa = SYMCALL<Actor*>("?fetchEntity@Level@@QEBAPEAVActor@@UActorUniqueID@@_N@Z",
 		f(VA, _this + 856), *(VA*)((*(VA(__fastcall**)(VA, char*))(*(VA*)dmsg + 64))(dmsg, &v72)), 0);
-	bool res = callpy(u8"ÉúÎïËÀÍö", Py_BuildValue("{s:i,s:K,s:K}",
+	bool res = callpy(u8"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½", Py_BuildValue("{s:i,s:K,s:K}",
 		"dmcase", f(unsigned, dmsg + 8),
 		"actor1", _this,
-		"actor2", sa//¿ÉÄÜÎª0
+		"actor2", sa//ï¿½ï¿½ï¿½ï¿½Îª0
 	));
 	if (res) original(_this, dmsg);
 }
-Hook(ÉúÎïÊÜÉË, bool, "?_hurt@Mob@@MEAA_NAEBVActorDamageSource@@H_N1@Z",
+Hook(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, bool, "?_hurt@Mob@@MEAA_NAEBVActorDamageSource@@H_N1@Z",
 	Mob* _this, VA dmsg, int a3, bool a4, bool a5) {
-	_Damage = a3;//½«ÉúÎïÊÜÉËµÄÖµÉèÖÃÎª¿Éµ÷Õû
+	_Damage = a3;//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëµï¿½Öµï¿½ï¿½ï¿½ï¿½Îªï¿½Éµï¿½ï¿½ï¿½
 	char v72;
 	Actor* sa = SYMCALL<Actor*>("?fetchEntity@Level@@QEBAPEAVActor@@UActorUniqueID@@_N@Z",
 		f(VA, _this + 856), *(VA*)((*(VA(__fastcall**)(VA, char*))(*(VA*)dmsg + 64))(dmsg, &v72)), 0);
-	bool res = callpy(u8"ÉúÎïÊÜÉË", Py_BuildValue("{s:i,s:K,s:K,s:i}",
+	bool res = callpy(u8"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½", Py_BuildValue("{s:i,s:K,s:K,s:i}",
 		"dmcase", f(unsigned, dmsg + 8),
 		"actor1", _this,
-		"actor2", sa,//¿ÉÄÜÎª0
+		"actor2", sa,//ï¿½ï¿½ï¿½ï¿½Îª0
 		"damage", a3
 	));
 	check_ret(_this, dmsg, _Damage, a4, a5);
 }
-Hook(Íæ¼ÒÖØÉú, void, "?respawn@Player@@UEAAXXZ",
+Hook(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, void, "?respawn@Player@@UEAAXXZ",
 	Player* p) {
-	callpy(u8"Íæ¼ÒÖØÉú", PyLong_FromUnsignedLongLong((VA)p));
+	callpy(u8"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½", PyLong_FromUnsignedLongLong((VA)p));
 	original(p);
 }
-Hook(ÁÄÌìÏûÏ¢, void, "?fireEventPlayerMessage@MinecraftEventing@@AEAAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@000@Z",
+Hook(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢, void, "?fireEventPlayerMessage@MinecraftEventing@@AEAAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@000@Z",
 	VA _this, string& sender, string& target, string& msg, string& style) {
-	callpy(u8"ÁÄÌìÏûÏ¢", Py_BuildValue("{s:s,s:s,s:s,s:s}",
+	callpy(u8"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢", Py_BuildValue("{s:s,s:s,s:s,s:s}",
 		"sender", sender.c_str(),
 		"target", target.c_str(),
 		"msg", msg.c_str(),
@@ -911,33 +911,33 @@ Hook(ÁÄÌìÏûÏ¢, void, "?fireEventPlayerMessage@MinecraftEventing@@AEAAXAEBV?$basi
 	));
 	original(_this, sender, target, msg, style);
 }
-Hook(ÊäÈëÎÄ±¾, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVTextPacket@@@Z",
+Hook(ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVTextPacket@@@Z",
 	VA _this, VA id, /*(TextPacket*)*/VA tp) {
 	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z",
 		_this, id, f(char, tp + 16));
 	if (p) {
 		string msg = f(string, tp + 80);
-		bool res = callpy(u8"ÊäÈëÎÄ±¾", Py_BuildValue("{s:K,s:s}",
+		bool res = callpy(u8"ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½", Py_BuildValue("{s:K,s:s}",
 			"player", p,
 			"msg", msg.c_str()
 		));
 		if (res)original(_this, id, tp);
 	}
 }
-Hook(ÊäÈëÖ¸Áî, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVCommandRequestPacket@@@Z",
+Hook(ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVCommandRequestPacket@@@Z",
 	VA _this, VA id, /*(CommandRequestPacket*)*/VA crp) {
 	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z",
 		_this, id, f(char, crp + 16));
 	if (p) {
 		string cmd = f(string, crp + 40);
-		bool res = callpy(u8"ÊäÈëÖ¸Áî", Py_BuildValue("{s:K,s:s}",
+		bool res = callpy(u8"ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½", Py_BuildValue("{s:K,s:s}",
 			"player", p,
 			"cmd", cmd.c_str()
 		));
 		if (res)original(_this, id, crp);
 	}
 }
-Hook(Ñ¡Ôñ±íµ¥, void, "?handle@?$PacketHandlerDispatcherInstance@VModalFormResponsePacket@@$0A@@@UEBAXAEBVNetworkIdentifier@@AEAVNetEventCallback@@AEAV?$shared_ptr@VPacket@@@std@@@Z",
+Hook(Ñ¡ï¿½ï¿½ï¿½ï¿½, void, "?handle@?$PacketHandlerDispatcherInstance@VModalFormResponsePacket@@$0A@@@UEBAXAEBVNetworkIdentifier@@AEAVNetEventCallback@@AEAV?$shared_ptr@VPacket@@@std@@@Z",
 	VA _this, VA id, VA handle,/*(ModalFormResponsePacket**)*/VA* fp) {
 	VA fmp = *fp;
 	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z",
@@ -948,7 +948,7 @@ Hook(Ñ¡Ôñ±íµ¥, void, "?handle@?$PacketHandlerDispatcherInstance@VModalFormRespon
 
 		//VA len = data.length() - 1;
 		//if (data[len] == '\n')data[len] = '\0';
-		callpy(u8"Ñ¡Ôñ±íµ¥", Py_BuildValue("{s:K,s:s,s:i}",
+		callpy(u8"Ñ¡ï¿½ï¿½ï¿½ï¿½", Py_BuildValue("{s:K,s:s,s:i}",
 			"player", p,
 			"selected", data.c_str(),
 			"formid", fid
@@ -957,7 +957,7 @@ Hook(Ñ¡Ôñ±íµ¥, void, "?handle@?$PacketHandlerDispatcherInstance@VModalFormRespon
 	}
 	original(_this, id, handle, fp);
 }
-Hook(¸üÐÂÃüÁî·½¿é, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVCommandBlockUpdatePacket@@@Z",
+Hook(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½î·½ï¿½ï¿½, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVCommandBlockUpdatePacket@@@Z",
 	VA _this, VA id, /*(CommandBlockUpdatePacket*)*/VA cbp) {
 	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z",
 		_this, id, *((char*)cbp + 16));
@@ -970,7 +970,7 @@ Hook(¸üÐÂÃüÁî·½¿é, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifi
 		auto output = f(string, cbp + 96);
 		auto rawname = f(string, cbp + 128);
 		auto delay = f(int, cbp + 160);
-		bool res = callpy(u8"ÃüÁî·½¿é¸üÐÂ", Py_BuildValue("{s:K,s:i,s:i,s:i,s:s,s:s,s:s,s:i,s:[i,i,i]}",
+		bool res = callpy(u8"ï¿½ï¿½ï¿½î·½ï¿½ï¿½ï¿½ï¿½ï¿½", Py_BuildValue("{s:K,s:i,s:i,s:i,s:s,s:s,s:s,s:i,s:[i,i,i]}",
 			"player", p,
 			"mode", mode,
 			"condition", condition,
@@ -984,9 +984,9 @@ Hook(¸üÐÂÃüÁî·½¿é, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifi
 		if (res)original(_this, id, cbp);
 	}
 }
-Hook(ÊÀ½ç±¬Õ¨, bool, "?explode@Level@@QEAAXAEAVBlockSource@@PEAVActor@@AEBVVec3@@M_N3M3@Z",
+Hook(ï¿½ï¿½ï¿½ç±¬Õ¨, bool, "?explode@Level@@QEAAXAEAVBlockSource@@PEAVActor@@AEBVVec3@@M_N3M3@Z",
 	Level* _this, BlockSource* bs, Actor* a3, const Vec3 pos, float a5, bool a6, bool a7, float a8, bool a9) {
-	bool res = callpy(u8"ÊÀ½ç±¬Õ¨", Py_BuildValue("{s:K,s:[f,f,f],s:i,s:i}",
+	bool res = callpy(u8"ï¿½ï¿½ï¿½ç±¬Õ¨", Py_BuildValue("{s:K,s:[f,f,f],s:i,s:i}",
 		"actor", a3,
 		"position", pos.x, pos.y, pos.z,
 		"dimensionid", bs->getDimensionId(),
@@ -994,18 +994,18 @@ Hook(ÊÀ½ç±¬Õ¨, bool, "?explode@Level@@QEAAXAEAVBlockSource@@PEAVActor@@AEBVVec3@
 	));
 	check_ret(_this, bs, a3, pos, a5, a6, a7, a8, a9);
 }
-Hook(ÃüÁî·½¿éÖ´ÐÐ, bool, "?performCommand@CommandBlockActor@@QEAA_NAEAVBlockSource@@@Z",
+Hook(ï¿½ï¿½ï¿½î·½ï¿½ï¿½Ö´ï¿½ï¿½, bool, "?performCommand@CommandBlockActor@@QEAA_NAEAVBlockSource@@@Z",
 	VA _this, BlockSource* a2) {
-	//Âö³å:0,ÖØ¸´:1,Á´:2
+	//ï¿½ï¿½ï¿½ï¿½:0,ï¿½Ø¸ï¿½:1,ï¿½ï¿½:2
 	int mode = SYMCALL<int>("?getMode@CommandBlockActor@@QEBA?AW4CommandBlockMode@@AEAVBlockSource@@@Z",
 		_this, a2);
-	//ÎÞÌõ¼þ:0,ÓÐÌõ¼þ:1
+	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:0,ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:1
 	bool condition = SYMCALL<bool>("?getConditionalMode@CommandBlockActor@@QEBA_NAEAVBlockSource@@@Z",
 		_this, a2);
 	string cmd = f(string, _this + 264);
 	string rawname = f(string, _this + 296);
 	BlockPos bp = f(BlockPos, _this + 44);
-	bool res = callpy(u8"ÃüÁî·½¿éÖ´ÐÐ", Py_BuildValue("{s:s,s:s,s:[i,i,i],s:i,s:i}",
+	bool res = callpy(u8"ï¿½ï¿½ï¿½î·½ï¿½ï¿½Ö´ï¿½ï¿½", Py_BuildValue("{s:s,s:s,s:[i,i,i],s:i,s:i}",
 		"cmd", cmd.c_str(),
 		"rawname", rawname.c_str(),
 		"position", bp.x, bp.y, bp.z,
@@ -1014,10 +1014,10 @@ Hook(ÃüÁî·½¿éÖ´ÐÐ, bool, "?performCommand@CommandBlockActor@@QEAA_NAEAVBlockSour
 	));
 	check_ret(_this, a2);
 }
-Hook(Íæ¼Ò´©´÷, void, "?setArmor@Player@@UEAAXW4ArmorSlot@@AEBVItemStack@@@Z",
+Hook(ï¿½ï¿½Ò´ï¿½ï¿½ï¿½, void, "?setArmor@Player@@UEAAXW4ArmorSlot@@AEBVItemStack@@@Z",
 	Player* p, unsigned slot, ItemStack* i) {
 	if (!i->getId())return original(p, slot, i);
-	bool res = callpy(u8"Íæ¼Ò´©´÷", Py_BuildValue("{s:K,s:i,s:i,s:s,s:i,s:i}",
+	bool res = callpy(u8"ï¿½ï¿½Ò´ï¿½ï¿½ï¿½", Py_BuildValue("{s:K,s:i,s:i,s:s,s:i,s:i}",
 		"player", p,
 		"itemid", i->getId(),
 		"itemcount", i->mCount,
@@ -1027,15 +1027,15 @@ Hook(Íæ¼Ò´©´÷, void, "?setArmor@Player@@UEAAXW4ArmorSlot@@AEBVItemStack@@@Z",
 	));
 	if (res)original(p, slot, i);
 }
-Hook(¼Æ·Ö°å¸Ä±ä, void, "?onScoreChanged@ServerScoreboard@@UEAAXAEBUScoreboardId@@AEBVObjective@@@Z",
+Hook(ï¿½Æ·Ö°ï¿½Ä±ï¿½, void, "?onScoreChanged@ServerScoreboard@@UEAAXAEBUScoreboardId@@AEBVObjective@@@Z",
 	const Scoreboard* _this, ScoreboardId* a2, Objective* a3) {
 	/*
-	Ô­ÃüÁî£º
-	´´½¨¼Æ·Ö°åÊ±£º/scoreboard objectives <add|remove> <objectivename> dummy <objectivedisplayname>
-	ÐÞ¸Ä¼Æ·Ö°åÊ±£¨´Ëº¯Êýhook´Ë´¦)£º/scoreboard players <add|remove|set> <playersname> <objectivename> <playersnum>
+	Ô­ï¿½ï¿½ï¿½î£º
+	ï¿½ï¿½ï¿½ï¿½ï¿½Æ·Ö°ï¿½Ê±ï¿½ï¿½/scoreboard objectives <add|remove> <objectivename> dummy <objectivedisplayname>
+	ï¿½Þ¸Ä¼Æ·Ö°ï¿½Ê±ï¿½ï¿½ï¿½Ëºï¿½ï¿½ï¿½hookï¿½Ë´ï¿½)ï¿½ï¿½/scoreboard players <add|remove|set> <playersname> <objectivename> <playersnum>
 	*/
 	int scoreboardid = a2->id;
-	callpy(u8"¼Æ·Ö°å¸Ä±ä", Py_BuildValue("{s:i,s:i,s:s,s:s}",
+	callpy(u8"ï¿½Æ·Ö°ï¿½Ä±ï¿½", Py_BuildValue("{s:i,s:i,s:s,s:s}",
 		"scoreboardid", scoreboardid,
 		"playersnum", a3->getPlayerScore(a2)->getCount(),
 		"objectivename", a3->getScoreName().c_str(),
@@ -1043,11 +1043,11 @@ Hook(¼Æ·Ö°å¸Ä±ä, void, "?onScoreChanged@ServerScoreboard@@UEAAXAEBUScoreboardId@
 	));
 	original(_this, a2, a3);
 }
-Hook(¸ûµØÆÆ»µ, void, "?transformOnFall@FarmBlock@@UEBAXAEAVBlockSource@@AEBVBlockPos@@PEAVActor@@M@Z",
+Hook(ï¿½ï¿½ï¿½ï¿½ï¿½Æ»ï¿½, void, "?transformOnFall@FarmBlock@@UEBAXAEAVBlockSource@@AEBVBlockPos@@PEAVActor@@M@Z",
 	VA _this, BlockSource* a1, BlockPos* a2, Player* p, VA a4) {
 	bool res = true;
 	if (PlayerCheck(p)) {
-		res = callpy(u8"¸ûµØÆÆ»µ", Py_BuildValue("{s:K,s:[i,i,i],s:i}",
+		res = callpy(u8"ï¿½ï¿½ï¿½ï¿½ï¿½Æ»ï¿½", Py_BuildValue("{s:K,s:[i,i,i],s:i}",
 			"player", p,
 			"position", a2->x, a2->y, a2->z,
 			"dimensionid", a1->getDimensionId()
@@ -1055,11 +1055,11 @@ Hook(¸ûµØÆÆ»µ, void, "?transformOnFall@FarmBlock@@UEBAXAEAVBlockSource@@AEBVBloc
 	}
 	if (res)original(_this, a1, a2, p, a4);
 }
-Hook(Ê¹ÓÃÖØÉúÃª, bool, "?trySetSpawn@RespawnAnchorBlock@@CA_NAEAVPlayer@@AEBVBlockPos@@AEAVBlockSource@@AEAVLevel@@@Z",
+Hook(Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãª, bool, "?trySetSpawn@RespawnAnchorBlock@@CA_NAEAVPlayer@@AEBVBlockPos@@AEAVBlockSource@@AEAVLevel@@@Z",
 	Player* p, BlockPos* a2, BlockSource* a3, void* a4) {
 	bool res = true;
 	if (PlayerCheck(p)) {
-		res = callpy(u8"Ê¹ÓÃÖØÉúÃª", Py_BuildValue("{s:K,s:[i,i,i],s:i}",
+		res = callpy(u8"Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãª", Py_BuildValue("{s:K,s:[i,i,i],s:i}",
 			"player", p,
 			"position", a2->x, a2->y, a2->z,
 			"dimensionid", a3->getDimensionId()
@@ -1084,10 +1084,10 @@ int DllMain(VA, int dwReason, VA) {
 		if (PyStatus_Exception(status)) {
 			Py_ExitStatusException(status);
 		}
-		PyImport_AppendInittab("mc", mc_init); //Ôö¼ÓÒ»¸öÄ£¿é
+		PyImport_AppendInittab("mc", mc_init); //ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½Ä£ï¿½ï¿½
 		Py_Initialize();
 		//pts["main"] = (VA)PyThreadState_Get();
-		_finddata_t Info;//ÓÃÓÚ²éÕÒµÄ¾ä±ú
+		_finddata_t Info;//ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ÒµÄ¾ï¿½ï¿½
 		long long handle = _findfirst("./py/*.py", &Info);
 		if (handle != -1) {
 			do {
