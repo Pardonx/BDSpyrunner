@@ -156,7 +156,7 @@ static bool TransferPacket(Player* p, const string& address, short port) {
 	}
 	return false;
 }
-static bool TextPacket(Player* p, char mode, string msg) {
+static bool TextPacket(Player* p, char mode, const string& msg) {
 	if (PlayerCheck(p)) {
 		VA pkt = createPacket(9);
 		f(char, pkt + 40) = mode;
@@ -167,12 +167,12 @@ static bool TextPacket(Player* p, char mode, string msg) {
 	}
 	return false;
 }
-static bool CommandRequestPacket(Player* p, string cmd) {
+static bool CommandRequestPacket(Player* p, const string& cmd) {
 	if (PlayerCheck(p)) {
 		VA pkt = createPacket(77);
 		f(string, pkt + 40) = cmd;
-		VA nid = p->getNetId();
-		SYMCALL<VA>("?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVCommandRequestPacket@@@Z", _ServerNetworkHandle, nid, pkt);
+		SYMCALL<VA>("?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVCommandRequestPacket@@@Z",
+			_ServerNetworkHandle, p->getNetId(), pkt);
 		//p->sendPacket(pkt);
 		return true;
 	}
@@ -776,7 +776,7 @@ Hook(后台输入, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@
 	VA _this, string& cmd) {
 	if (!isUTF8(cmd.c_str()))
 		return 0;
-	bool res = callpy(u8"后台输入", PyBytes_FromString(cmd.c_str()));
+	bool res = callpy(u8"后台输入", PyUnicode_FromString(cmd.c_str()));
 	check_ret(_this, cmd);
 }
 Hook(加入游戏, VA, "?onPlayerJoined@ServerScoreboard@@UEAAXAEBVPlayer@@@Z",
@@ -1141,11 +1141,11 @@ int DllMain(VA, int dwReason, VA) {
 		long long handle = _findfirst("./py/*.py", &Info);
 		if (handle != -1) {
 			do {
-				//pts[name] = (VA)Py_NewInterpreter();
-				FILE* file = fopen(((string)"./py/" + Info.name).c_str(), "rb");
-				Py_NewInterpreter();
 				cout << "[BDSpyrunner] running " << Info.name << endl;
-				PyRun_SimpleFileExFlags(file, Info.name, 1, 0);
+				string name = Info.name;
+				name.resize(name.length() - 3);
+				PyImport_ImportModule(("py." + name).c_str());
+				PyErr_Print();
 			} while (!_findnext(handle, &Info));
 		}
 		_findclose(handle);
