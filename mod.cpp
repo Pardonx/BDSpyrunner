@@ -6,7 +6,6 @@
 #define api_function(name) static PyObject* api_##name(PyObject*, PyObject*args)
 #define check_ret(...) if (!res) return 0;return original(__VA_ARGS__)
 #define PlayerCheck(ptr)  PlayerList[(Player*)ptr]
-//#define createPacket(pkt, i) SYMCALL("?createPacket@MinecraftPackets@@SA?AV?$shared_ptr@VPacket@@@std@@W4MinecraftPacketIds@@@Z",pkt,i);
 #pragma endregion
 #pragma region 全局变量
 static VA _cmdqueue, _level, _ServerNetworkHandle;
@@ -130,7 +129,7 @@ static char stoe(const string& s) {
 static bool callpy(const char* type, PyObject* val) {
 	bool result = true;
 	for (PyObject* fn : PyFuncs[type]) {
-		if (PyObject_CallOneArg(fn, val) == Py_False)
+		if (PyObject_CallFunction(fn, "O", val) == Py_False)
 			result = false;
 	}
 	PyErr_Print();
@@ -497,7 +496,7 @@ api_function(removeBossBar) {
 	}
 	return Py_False;
 }
-//通过玩家指针获取计分板id
+// 通过玩家指针获取计分板id
 api_function(getScoreBoardId) {
 	Player* p;
 	if (PyArg_ParseTuple(args, "K:getScoreBoardId", &p)) {
@@ -519,7 +518,7 @@ api_function(createScoreBoardId) {
 	}
 	return Py_False;
 }
-//修改生物受伤的伤害值!
+// 修改生物受伤的伤害值!
 api_function(setDamage) {
 	int a;
 	if (PyArg_ParseTuple(args, "i:setDamage", &a)) {
@@ -674,7 +673,6 @@ api_function(removeSidebar) {
 	}
 	return Py_None;
 }
-
 PyMethodDef api_list[] = {
 api_method(logout),
 api_method(runcmd),
@@ -733,7 +731,7 @@ Hook(世界Tick, void, "?tick@Level@@UEAAXXZ",
 	for (auto& i : tick) {
 		if (!i.second.first) {
 			i.second.first = i.second.second;
-			PyObject_CallNoArgs(i.first);
+			PyObject_CallFunction(i.first, 0);
 		}
 		else i.second.first--;
 	}
@@ -1129,14 +1127,14 @@ int DllMain(VA, int dwReason, VA) {
 		//Tag* t = toTag(toJson(R"({"az9":[{"p1":2}]})"));
 		//cout << toJson(t).toStyledString() << endl;
 		//delete t;
-		PyPreConfig cfg;
-		PyPreConfig_InitPythonConfig(&cfg);
-		cfg.utf8_mode = 1;
-		cfg.configure_locale = 0;
-		PyStatus status = Py_PreInitialize(&cfg);
-		if (PyStatus_Exception(status)) {
-			Py_ExitStatusException(status);
-		}
+		//PyPreConfig cfg;
+		//PyPreConfig_InitPythonConfig(&cfg);
+		//cfg.utf8_mode = 1;
+		//cfg.configure_locale = 0;
+		//PyStatus status = Py_PreInitialize(&cfg);
+		//if (PyStatus_Exception(status)) {
+		//	Py_ExitStatusException(status);
+		//}
 		PyImport_AppendInittab("mc", mc_init); //增加一个模块
 		Py_Initialize();
 		_finddata_t Info;//用于查找的句柄
@@ -1146,12 +1144,12 @@ int DllMain(VA, int dwReason, VA) {
 				//pts[name] = (VA)Py_NewInterpreter();
 				FILE* file = fopen(((string)"./py/" + Info.name).c_str(), "rb");
 				Py_NewInterpreter();
-				printf(u8"[BDSpyrunner] 读取 %s.\n", Info.name);
+				cout << "[BDSpyrunner] running " << Info.name << endl;
 				PyRun_SimpleFileExFlags(file, Info.name, 1, 0);
 			} while (!_findnext(handle, &Info));
 		}
 		_findclose(handle);
-		puts(u8"[BDSpyrunner] 已装载，版本0.2.0，本插件使用GPL3.0开源，请遵守协议");
+		puts(u8"[BDSpyrunner] 已装载，版本0.2.0，本插件使用GPL3.0协议开源，开源地址: https://github.com/twoone-3/BDSpyrunner");
 	}
 	return 1;
 }
