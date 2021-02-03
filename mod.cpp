@@ -90,9 +90,9 @@ static bool isUTF8(const char* str) {
 	}
 	return true;
 }
-static inline VA createPacket(char type) {
+static inline VA createPacket(int type) {
 	VA pkt;
-	SYMCALL<VA>("?createPacket@MinecraftPackets@@SA?AV?$shared_ptr@VPacket@@@std@@W4MinecraftPacketIds@@@Z",
+	SYMCALL("?createPacket@MinecraftPackets@@SA?AV?$shared_ptr@VPacket@@@std@@W4MinecraftPacketIds@@@Z",
 		&pkt, type);
 	return pkt;
 }
@@ -291,7 +291,7 @@ api_function(setCommandDescription) {
 	return Py_False;
 }
 api_function(getPlayerList) {
-	auto list = PyList_New(PlayerList.size());
+	auto list = PyList_New(0);
 	PyArg_ParseTuple(args, ":getPlayerList");
 	for (auto& p : PlayerList) {
 		PyList_Append(list, PyLong_FromUnsignedLongLong((VA)p.first));
@@ -1149,7 +1149,7 @@ int DllMain(VA, int dwReason, VA) {
 			} while (!_findnext(handle, &Info));
 		}
 		_findclose(handle);
-		puts(u8"[BDSpyrunner] 已装载，版本0.2.0，本插件使用GPL3.0协议开源，开源地址: https://github.com/twoone-3/BDSpyrunner");
+		puts(u8"[BDSpyrunner] 已装载，版本0.2.0，本插件使用GPL3.0协议开源，\n开源地址: https://github.com/twoone-3/BDSpyrunner");
 	}
 	return 1;
 }

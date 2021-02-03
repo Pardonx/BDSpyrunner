@@ -9,8 +9,8 @@
 #include "json/json.h"
 #include "include/Python.h"
 #define f(type, ptr) (*(type*)(ptr))
-#define SYM GetServerSymbol
 #define SYMAS(ret, fn, ...) ((ret(*)(__VA_ARGS__))SYM(fn))
+#define SYM GetServerSymbol
 using VA = unsigned long long;
 extern "C" {
 	_declspec(dllimport) int HookFunction(void*, void*, void*);
