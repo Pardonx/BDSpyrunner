@@ -294,7 +294,8 @@ api_function(getPlayerList) {
 	auto list = PyList_New(0);
 	PyArg_ParseTuple(args, ":getPlayerList");
 	for (auto& p : PlayerList) {
-		PyList_Append(list, PyLong_FromUnsignedLongLong((VA)p.first));
+		if (p.second)
+			PyList_Append(list, PyLong_FromUnsignedLongLong((VA)p.first));
 	}
 	return list;
 }
@@ -788,6 +789,7 @@ Hook(加入游戏, VA, "?onPlayerJoined@ServerScoreboard@@UEAAXAEBVPlayer@@@Z",
 Hook(离开游戏, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer@@_N@Z",
 	VA _this, Player* p, char v3) {
 	callpy(u8"离开游戏", PyLong_FromUnsignedLongLong((VA)p));
+	PlayerList[p] = false;
 	PlayerList.erase(p);
 	return original(_this, p, v3);
 }
