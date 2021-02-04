@@ -39,9 +39,41 @@ struct BlockSource {
 		return f(int, (f(VA, this + 32) + 208));
 	}
 };
-struct Level {};
+struct Dimension {
+	// 获取方块源
+	VA getBlockSource() {// IDA Level::tickEntities
+		return f(VA, this + 10);
+	}
+};
+struct Level {
+	// 获取维度
+	Dimension* getDimension(int did) {
+		return SYMCALL<Dimension*>("?getDimension@Level@@QEBAPEAVDimension@@V?$AutomaticID@VDimension@@H@@@Z",
+			this, did);
+	}
+	// 获取计分板
+	VA getScoreBoard() {// IDA Level::removeEntityReferences
+		return f(VA, this + 8376);
+	}
+};
 struct Vec3 { float x = 0.0f, y = 0.0f, z = 0.0f; };
 struct Vec2 { float x = 0.0f, y = 0.0f; };
+struct StructureSettings {
+	char fill[96];
+	StructureSettings() {
+		SYMCALL("??0StructureSettings@@QEAA@XZ",this);
+	}
+};
+struct StructureTemplate {
+	char fill[208];
+	StructureTemplate(string_span s) {
+		SYMCALL("??0StructureTemplate@@QEAA@V?$basic_string_span@$$CBD$0?0@gsl@@@Z", this,s);
+	}
+	void fillFromWorld(BlockSource* bs,BlockPos* bp,StructureSettings* ss) {
+		SYMCALL("?fillFromWorld@StructureTemplate@@QEAAXAEAVBlockSource@@AEBVBlockPos@@AEBVStructureSettings@@@Z",
+			this, bs, bp, ss);
+	}
+};
 struct MobEffectInstance { char fill[0x1C]; };
 struct Item;
 struct ItemStackBase {

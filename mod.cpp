@@ -8,7 +8,7 @@
 #define PlayerCheck(ptr)  PlayerList[(Player*)ptr]
 #pragma endregion
 #pragma region 全局变量
-static VA _cmdqueue, _level, _ServerNetworkHandle;
+static VA _cmdqueue = 0, _level = 0, _ServerNetworkHandle = 0;
 static const VA STD_COUT_HANDLE = f(VA, SYM("__imp_?cout@std@@3V?$basic_ostream@DU?$char_traits@D@std@@@1@A"));
 static Scoreboard* _scoreboard;//储存计分板名称
 static unsigned _formid = 1;//表单ID
@@ -530,10 +530,10 @@ api_function(setDamage) {
 }
 api_function(setServerMotd) {
 	const char* n;
-	if (PyArg_ParseTuple(args, "s:setServerMotd", &n)) {
+	if (PyArg_ParseTuple(args, "s:setServerMotd", &n) && _ServerNetworkHandle) {
 		string name = n;
-		SYMCALL("?allowIncomingConnections@ServerNetworkHandler@@QEAAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z",
-			_ServerNetworkHandle, &n, 1);
+		SYMCALL<VA>("?allowIncomingConnections@ServerNetworkHandler@@QEAAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z",
+			_ServerNetworkHandle, &name, true);
 		return Py_True;
 	}
 	return Py_False;
@@ -775,9 +775,15 @@ Hook(后台输出, VA, "??$_Insert_string@DU?$char_traits@D@std@@_K@std@@YAAEAV?$bas
 }
 Hook(后台输入, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@AEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
 	VA _this, string& cmd) {
-	if (!isUTF8(cmd.c_str()))
-		return 0;
-	bool res = callpy(u8"后台输入", PyUnicode_FromString(cmd.c_str()));
+	bool res = true;
+	if (cmd == "pyreload") {
+		Py_Finalize();
+		void init();
+		init();
+	}
+	if (isUTF8(cmd.c_str())) {
+		res = callpy(u8"后台输入", PyUnicode_FromString(cmd.c_str()));
+	}
 	check_ret(_this, cmd);
 }
 Hook(加入游戏, VA, "?onPlayerJoined@ServerScoreboard@@UEAAXAEBVPlayer@@@Z",
@@ -1121,37 +1127,33 @@ Hook(使用重生锚, bool, "?trySetSpawn@RespawnAnchorBlock@@CA_NAEAVPlayer@@AEBVBlo
 	check_ret(p, a2, a3, a4);
 }
 #pragma endregion
+void init() {
+	//PyPreConfig cfg;
+	//PyPreConfig_InitPythonConfig(&cfg);
+	//cfg.utf8_mode = 1;
+	//cfg.configure_locale = 0;
+	//Py_PreInitialize(&cfg);
+	PyImport_AppendInittab("mc", mc_init); //增加一个模块
+	Py_Initialize();
+	_finddata_t Info;//用于查找的句柄
+	long long handle = _findfirst("./py/*.py", &Info);
+	if (handle != -1) {
+		do {
+			cout << "[BDSpyrunner] loading " << Info.name << endl;
+			string name = Info.name;
+			name.resize(name.length() - 3);
+			PyImport_ImportModule(("py." + name).c_str());
+			PyErr_Print();
+		} while (!_findnext(handle, &Info));
+	}
+	_findclose(handle);
+}
 int DllMain(VA, int dwReason, VA) {
 	if (dwReason == 1) {
-		//fstream of("bag.json");
-		//string str((std::istreambuf_iterator<char>(of)), std::istreambuf_iterator<char>());
-		//of.close();
-		//Tag* t = toTag(toJson(R"({"az9":[{"p1":2}]})"));
-		//cout << toJson(t).toStyledString() << endl;
-		//delete t;
-		//PyPreConfig cfg;
-		//PyPreConfig_InitPythonConfig(&cfg);
-		//cfg.utf8_mode = 1;
-		//cfg.configure_locale = 0;
-		//PyStatus status = Py_PreInitialize(&cfg);
-		//if (PyStatus_Exception(status)) {
-		//	Py_ExitStatusException(status);
-		//}
-		PyImport_AppendInittab("mc", mc_init); //增加一个模块
-		Py_Initialize();
-		_finddata_t Info;//用于查找的句柄
-		long long handle = _findfirst("./py/*.py", &Info);
-		if (handle != -1) {
-			do {
-				cout << "[BDSpyrunner] running " << Info.name << endl;
-				string name = Info.name;
-				name.resize(name.length() - 3);
-				PyImport_ImportModule(("py." + name).c_str());
-				PyErr_Print();
-			} while (!_findnext(handle, &Info));
-		}
-		_findclose(handle);
-		puts(u8"[BDSpyrunner] 已装载，版本0.2.0，本插件使用GPL3.0协议开源，\n开源地址: https://github.com/twoone-3/BDSpyrunner");
+		init();
+		puts("[BDSpyrunner] v0.2.1 loaded.\n"
+			"This plug-in uses GPL3.0 agreement open source\n"
+			"Link : https://github.com/twoone-3/BDSpyrunner");
 	}
 	return 1;
 }
