@@ -5,6 +5,8 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <queue>
+#include <functional>
 #include <unordered_map>
 #include "json/json.h"
 #include "include/Python.h"

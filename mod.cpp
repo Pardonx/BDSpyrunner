@@ -18,6 +18,7 @@ static vector<pair<string, string>> Command;//注册命令
 static unordered_map<string, PyObject*> ShareData;//共享数据
 static int _Damage;//伤害值
 static unordered_map<PyObject*, pair<unsigned, unsigned>> tick;//执行队列
+static queue<function<void()>> todos;
 #pragma endregion
 #pragma region 函数定义
 static Json::Value toJson(const string& s) {
@@ -727,6 +728,13 @@ extern "C" PyObject * mc_init() {
 Hook(世界Tick, void, "?tick@Level@@UEAAXXZ",
 	VA a1, VA a2, VA a3, VA a4) {
 	original(a1, a2, a3, a4);
+	size_t l = todos.size();
+	if (l > 0) {
+		for (int i = 0; i < l; i++) {
+			todos.front()();
+			todos.pop();
+		}
+	}
 	if (tick.empty())
 		return;
 	for (auto& i : tick) {
@@ -776,21 +784,24 @@ Hook(后台输出, VA, "??$_Insert_string@DU?$char_traits@D@std@@_K@std@@YAAEAV?$bas
 Hook(后台输入, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@$0CAA@@@AEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
 	VA _this, string& cmd) {
 	bool res = true;
-	if (cmd == "pyreload") {
+	/*if (cmd == "pyreload") {
+		PyFuncs.clear();
 		Py_Finalize();
 		void init();
 		init();
-	}
+		return 0;
+	}*/
 	if (isUTF8(cmd.c_str())) {
 		res = callpy(u8"后台输入", PyUnicode_FromString(cmd.c_str()));
 	}
 	check_ret(_this, cmd);
 }
-Hook(加入游戏, VA, "?onPlayerJoined@ServerScoreboard@@UEAAXAEBVPlayer@@@Z",
-	VA a1, Player* p) {
+Hook(加入游戏, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVSetLocalPlayerAsInitializedPacket@@@Z",
+	VA _this, VA a2, VA a3) {
+	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z", _this, a2, *(VA*)(a3 + 16));
 	PlayerList[p] = true;
 	callpy(u8"加入游戏", PyLong_FromUnsignedLongLong((VA)p));
-	return original(a1, p);
+	original(_this, a2, a3);
 }
 Hook(离开游戏, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer@@_N@Z",
 	VA _this, Player* p, char v3) {
@@ -1004,9 +1015,7 @@ Hook(选择表单, void, "?handle@?$PacketHandlerDispatcherInstance@VModalFormRespon
 	if (PlayerCheck(p)) {
 		unsigned fid = f(unsigned, fmp + 40);
 		string data = f(string, fmp + 48);
-
-		//VA len = data.length() - 1;
-		//if (data[len] == '\n')data[len] = '\0';
+		if (*data.end() == '\n')data.pop_back();
 		callpy(u8"选择表单", Py_BuildValue("{s:K,s:s,s:i}",
 			"player", p,
 			"selected", data.c_str(),
@@ -1151,9 +1160,7 @@ void init() {
 int DllMain(VA, int dwReason, VA) {
 	if (dwReason == 1) {
 		init();
-		puts("[BDSpyrunner] v0.2.1 loaded.\n"
-			"This plug-in uses GPL3.0 agreement open source\n"
-			"Link : https://github.com/twoone-3/BDSpyrunner");
+		puts("[BDSpyrunner] v0.2.2 loaded.");
 	}
 	return 1;
 }
