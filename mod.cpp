@@ -125,6 +125,7 @@ static char stoe(const string& s) {
 	else if (s == u8"玩家穿戴")return 24;
 	else if (s == u8"耕地破坏")return 25;
 	else if (s == u8"使用重生锚")return 26;
+	else if (s == u8"计分板改变")return 27;
 	else return-1;
 }
 static bool callpy(const char* type, PyObject* val) {
@@ -811,7 +812,7 @@ Hook(离开游戏, void, "?_onPlayerLeft@ServerNetworkHandler@@AEAAXPEAVServerPlayer
 	return original(_this, p, v3);
 }
 Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EAEBVVec3@@PEBVBlock@@@Z",
-	VA _this, ItemStack* item, BlockPos* bp, unsigned __int8 a4, VA v5, Block* b) {
+	VA _this, ItemStack* item, BlockPos* bp, unsigned __int8 a4, VA a5, Block* b) {
 	Player* p = f(Player*, _this + 8);
 	short iid = item->getId();
 	short iaux = item->mAuxValue;
@@ -819,8 +820,7 @@ Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EA
 	BlockLegacy* bl = b->getBlockLegacy();
 	short bid = bl->getBlockItemID();
 	string bn = bl->getBlockName();
-	bool res = true;
-	res = callpy(u8"使用物品", Py_BuildValue("{s:K,s:i,s:i,s:s,s:s,s:i,s:[i,i,i]}",
+	bool res = callpy(u8"使用物品", Py_BuildValue("{s:K,s:i,s:i,s:s,s:s,s:i,s:[i,i,i]}",
 		"player", p,
 		"itemid", iid,
 		"itemaux", iaux,
@@ -829,7 +829,7 @@ Hook(使用物品, bool, "?useItemOn@GameMode@@UEAA_NAEAVItemStack@@AEBVBlockPos@@EA
 		"blockid", bid,
 		"position", bp->x, bp->y, bp->z
 	));
-	check_ret(_this, item, bp, a4, v5, b);
+	check_ret(_this, item, bp, a4, a5, b);
 }
 Hook(放置方块, bool, "?mayPlace@BlockSource@@QEAA_NAEBVBlock@@AEBVBlockPos@@EPEAVActor@@_N@Z",
 	BlockSource* _this, Block* b, BlockPos* bp, unsigned __int8 a4, Actor* p, bool _bool) {
@@ -1015,7 +1015,7 @@ Hook(选择表单, void, "?handle@?$PacketHandlerDispatcherInstance@VModalFormRespon
 	if (PlayerCheck(p)) {
 		unsigned fid = f(unsigned, fmp + 40);
 		string data = f(string, fmp + 48);
-		if (*data.end() == '\n')data.pop_back();
+		if (data.back() == '\n')data.pop_back();
 		callpy(u8"选择表单", Py_BuildValue("{s:K,s:s,s:i}",
 			"player", p,
 			"selected", data.c_str(),
@@ -1053,7 +1053,7 @@ Hook(更新命令方块, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifi
 	}
 }
 Hook(世界爆炸, bool, "?explode@Level@@QEAAXAEAVBlockSource@@PEAVActor@@AEBVVec3@@M_N3M3@Z",
-	Level* _this, BlockSource* bs, Actor* a3, const Vec3 pos, float a5, bool a6, bool a7, float a8, bool a9) {
+	Level* _this, BlockSource* bs, Actor* a3, Vec3 pos, float a5, bool a6, bool a7, float a8, bool a9) {
 	bool res = callpy(u8"世界爆炸", Py_BuildValue("{s:K,s:[f,f,f],s:i,s:i}",
 		"actor", a3,
 		"position", pos.x, pos.y, pos.z,
@@ -1144,6 +1144,7 @@ void init() {
 	//Py_PreInitialize(&cfg);
 	PyImport_AppendInittab("mc", mc_init); //增加一个模块
 	Py_Initialize();
+	PyGILState_Release(PyGILState_Ensure());
 	_finddata_t Info;//用于查找的句柄
 	long long handle = _findfirst("./py/*.py", &Info);
 	if (handle != -1) {
@@ -1159,8 +1160,9 @@ void init() {
 }
 int DllMain(VA, int dwReason, VA) {
 	if (dwReason == 1) {
+		ios::sync_with_stdio(false);
 		init();
-		puts("[BDSpyrunner] v0.2.2 loaded.");
+		puts("[BDSpyrunner] v0.2.3 loaded.");
 	}
 	return 1;
 }
