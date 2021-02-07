@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="LiteLoader.lib" />
+    <Library Include="chakra.lib" />
     <Library Include="python36.lib" />
   </ItemGroup>
   <ItemGroup>

@@ -12,11 +12,11 @@
 #include "include/Python.h"
 #define f(type, ptr) (*(type*)(ptr))
 #define SYMAS(ret, fn, ...) ((ret(*)(__VA_ARGS__))SYM(fn))
-#define SYM dlsym_real
+#define SYM GetServerSymbol
 using VA = unsigned long long;
 extern "C" {
 	_declspec(dllimport) int HookFunction(void*, void*, void*);
-	_declspec(dllimport) void* dlsym_real(const char*);
+	_declspec(dllimport) void* GetServerSymbol(const char*);
 }
 template<typename ret = void, typename... Args>
 inline ret SYMCALL(const char* sym, Args... args) {

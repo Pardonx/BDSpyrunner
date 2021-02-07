@@ -43,6 +43,10 @@ struct Level {
 	VA getScoreBoard() {// IDA Level::removeEntityReferences
 		return f(VA, this + 8376);
 	}
+	struct Actor* fetchEntity(VA id) {
+		return SYMCALL<struct Actor*>("?fetchEntity@Level@@QEBAPEAVActor@@UActorUniqueID@@_N@Z",
+			this, id, false);
+	}
 };
 struct Vec3 { float x = 0.0f, y = 0.0f, z = 0.0f; };
 struct Vec2 { float x = 0.0f, y = 0.0f; };

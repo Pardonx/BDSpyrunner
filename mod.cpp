@@ -8,7 +8,8 @@
 #define PlayerCheck(ptr)  PlayerList[(Player*)ptr]
 #pragma endregion
 #pragma region 全局变量
-static VA _cmdqueue = 0, _level = 0, _ServerNetworkHandle = 0;
+static VA _cmdqueue = 0, _ServerNetworkHandle = 0;
+static Level* _level = 0;
 static const VA STD_COUT_HANDLE = f(VA, SYM("__imp_?cout@std@@3V?$basic_ostream@DU?$char_traits@D@std@@@1@A"));
 static Scoreboard* _scoreboard;//储存计分板名称
 static unsigned _formid = 1;//表单ID
@@ -751,7 +752,7 @@ Hook(获取指令队列, VA, "??0?$SPSCQueue@V?$basic_string@DU?$char_traits@D@std@@V?
 	_cmdqueue = original(_this);
 	return _cmdqueue;
 }
-Hook(获取地图初始化信息, VA, "??0Level@@QEAA@AEBV?$not_null@V?$NonOwnerPointer@VSoundPlayerInterface@@@Bedrock@@@gsl@@V?$unique_ptr@VLevelStorage@@U?$default_delete@VLevelStorage@@@std@@@std@@V?$unique_ptr@VLevelLooseFileStorage@@U?$default_delete@VLevelLooseFileStorage@@@std@@@4@AEAVIMinecraftEventing@@_NEAEAVScheduler@@AEAVStructureManager@@AEAVResourcePackManager@@AEAVIEntityRegistryOwner@@V?$unique_ptr@VBlockComponentFactory@@U?$default_delete@VBlockComponentFactory@@@std@@@4@V?$unique_ptr@VBlockDefinitionGroup@@U?$default_delete@VBlockDefinitionGroup@@@std@@@4@@Z",
+Hook(获取地图初始化信息, Level*, "??0Level@@QEAA@AEBV?$not_null@V?$NonOwnerPointer@VSoundPlayerInterface@@@Bedrock@@@gsl@@V?$unique_ptr@VLevelStorage@@U?$default_delete@VLevelStorage@@@std@@@std@@V?$unique_ptr@VLevelLooseFileStorage@@U?$default_delete@VLevelLooseFileStorage@@@std@@@4@AEAVIMinecraftEventing@@_NEAEAVScheduler@@AEAVStructureManager@@AEAVResourcePackManager@@AEAVIEntityRegistryOwner@@V?$unique_ptr@VBlockComponentFactory@@U?$default_delete@VBlockComponentFactory@@@std@@@4@V?$unique_ptr@VBlockDefinitionGroup@@U?$default_delete@VBlockDefinitionGroup@@@std@@@4@@Z",
 	VA a1, VA a2, VA a3, VA a4, VA a5, VA a6, VA a7, VA a8, VA a9, VA a10, VA a11, VA a12, VA a13) {
 	_level = original(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
 	return _level;
@@ -799,7 +800,8 @@ Hook(后台输入, bool, "??$inner_enqueue@$0A@AEBV?$basic_string@DU?$char_traits@D@
 }
 Hook(加入游戏, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVSetLocalPlayerAsInitializedPacket@@@Z",
 	VA _this, VA a2, VA a3) {
-	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z", _this, a2, *(VA*)(a3 + 16));
+	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z",
+		_this, a2, *(VA*)(a3 + 16));
 	PlayerList[p] = true;
 	callpy(u8"加入游戏", PyLong_FromUnsignedLongLong((VA)p));
 	original(_this, a2, a3);
@@ -943,8 +945,7 @@ Hook(切换维度, bool, "?_playerChangeDimension@Level@@AEAA_NPEAVPlayer@@AEAVChang
 Hook(生物死亡, void, "?die@Mob@@UEAAXAEBVActorDamageSource@@@Z",
 	Mob* _this, VA dmsg) {
 	char v72;
-	Actor* sa = SYMCALL<Actor*>("?fetchEntity@Level@@QEBAPEAVActor@@UActorUniqueID@@_N@Z",
-		f(VA, _this + 856), *(VA*)((*(VA(__fastcall**)(VA, char*))(*(VA*)dmsg + 64))(dmsg, &v72)), 0);
+	Actor* sa = f(Level*, _this + 856)->fetchEntity(*(VA*)((*(VA(__fastcall**)(VA, char*))(*(VA*)dmsg + 64))(dmsg, &v72)));
 	bool res = callpy(u8"生物死亡", Py_BuildValue("{s:I,s:K,s:K}",
 		"dmcase", f(unsigned, dmsg + 8),
 		"actor1", _this,
@@ -956,8 +957,7 @@ Hook(生物受伤, bool, "?_hurt@Mob@@MEAA_NAEBVActorDamageSource@@H_N1@Z",
 	Mob* _this, VA dmsg, int a3, bool a4, bool a5) {
 	_Damage = a3;//将生物受伤的值设置为可调整
 	char v72;
-	Actor* sa = SYMCALL<Actor*>("?fetchEntity@Level@@QEBAPEAVActor@@UActorUniqueID@@_N@Z",
-		f(VA, _this + 856), *(VA*)((*(VA(__fastcall**)(VA, char*))(*(VA*)dmsg + 64))(dmsg, &v72)), 0);
+	Actor* sa = f(Level*, _this + 856)->fetchEntity(*(VA*)((*(VA(__fastcall**)(VA, char*))(*(VA*)dmsg + 64))(dmsg, &v72)));
 	bool res = callpy(u8"生物受伤", Py_BuildValue("{s:i,s:K,s:K,s:i}",
 		"dmcase", f(unsigned, dmsg + 8),
 		"actor1", _this,
@@ -982,63 +982,63 @@ Hook(聊天消息, void, "?fireEventPlayerMessage@MinecraftEventing@@AEAAXAEBV?$basi
 	original(_this, sender, target, msg, style);
 }
 Hook(输入文本, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVTextPacket@@@Z",
-	VA _this, VA id, /*(TextPacket*)*/VA tp) {
+	VA _this, VA id, /*(TextPacket*)*/VA pkt) {
 	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z",
-		_this, id, f(char, tp + 16));
+		_this, id, f(char, pkt + 16));
 	if (p) {
-		string msg = f(string, tp + 80);
+		string msg = f(string, pkt + 80);
 		bool res = callpy(u8"输入文本", Py_BuildValue("{s:K,s:s}",
 			"player", p,
 			"msg", msg.c_str()
 		));
-		if (res)original(_this, id, tp);
+		if (res)original(_this, id, pkt);
 	}
 }
 Hook(输入指令, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVCommandRequestPacket@@@Z",
-	VA _this, VA id, /*(CommandRequestPacket*)*/VA crp) {
+	VA _this, VA id, /*(CommandRequestPacket*)*/VA pkt) {
 	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z",
-		_this, id, f(char, crp + 16));
+		_this, id, f(char, pkt + 16));
 	if (p) {
-		string cmd = f(string, crp + 40);
+		string cmd = f(string, pkt + 40);
 		bool res = callpy(u8"输入指令", Py_BuildValue("{s:K,s:s}",
 			"player", p,
 			"cmd", cmd.c_str()
 		));
-		if (res)original(_this, id, crp);
+		if (res)original(_this, id, pkt);
 	}
 }
 Hook(选择表单, void, "?handle@?$PacketHandlerDispatcherInstance@VModalFormResponsePacket@@$0A@@@UEBAXAEBVNetworkIdentifier@@AEAVNetEventCallback@@AEAV?$shared_ptr@VPacket@@@std@@@Z",
-	VA _this, VA id, VA handle,/*(ModalFormResponsePacket**)*/VA* fp) {
-	VA fmp = *fp;
+	VA _this, VA id, VA handle,/*(ModalFormResponsePacket**)*/VA* ppkt) {
+	VA pkt = *ppkt;
 	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z",
-		handle, id, f(char, fmp + 16));
+		handle, id, f(char, pkt + 16));
 	if (PlayerCheck(p)) {
-		unsigned fid = f(unsigned, fmp + 40);
-		string data = f(string, fmp + 48);
+		unsigned fid = f(unsigned, pkt + 40);
+		string data = f(string, pkt + 48);
 		if (data.back() == '\n')data.pop_back();
 		callpy(u8"选择表单", Py_BuildValue("{s:K,s:s,s:i}",
 			"player", p,
 			"selected", data.c_str(),
 			"formid", fid
 		));
-
 	}
-	original(_this, id, handle, fp);
+	original(_this, id, handle, ppkt);
 }
 Hook(更新命令方块, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVCommandBlockUpdatePacket@@@Z",
-	VA _this, VA id, /*(CommandBlockUpdatePacket*)*/VA cbp) {
+	VA _this, VA id, /*(CommandBlockUpdatePacket*)*/VA pkt) {
+	bool res = true;
 	Player* p = SYMCALL<Player*>("?_getServerPlayer@ServerNetworkHandler@@AEAAPEAVServerPlayer@@AEBVNetworkIdentifier@@E@Z",
-		_this, id, *((char*)cbp + 16));
+		_this, id, *((char*)pkt + 16));
 	if (PlayerCheck(p)) {
-		auto bp = f(BlockPos, cbp + 40);
-		auto mode = f(unsigned short, cbp + 52);
-		auto condition = f(bool, cbp + 54);
-		auto redstone = f(bool, cbp + 55);
-		auto cmd = f(string, cbp + 64);
-		auto output = f(string, cbp + 96);
-		auto rawname = f(string, cbp + 128);
-		auto delay = f(int, cbp + 160);
-		bool res = callpy(u8"命令方块更新", Py_BuildValue("{s:K,s:i,s:i,s:i,s:s,s:s,s:s,s:i,s:[i,i,i]}",
+		auto bp = f(BlockPos, pkt + 40);
+		auto mode = f(unsigned short, pkt + 52);
+		auto condition = f(bool, pkt + 54);
+		auto redstone = f(bool, pkt + 55);
+		auto cmd = f(string, pkt + 64);
+		auto output = f(string, pkt + 96);
+		auto rawname = f(string, pkt + 128);
+		auto delay = f(int, pkt + 160);
+		res = callpy(u8"命令方块更新", Py_BuildValue("{s:K,s:i,s:i,s:i,s:s,s:s,s:s,s:i,s:[i,i,i]}",
 			"player", p,
 			"mode", mode,
 			"condition", condition,
@@ -1049,8 +1049,8 @@ Hook(更新命令方块, void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifi
 			"delay", delay,
 			"position", bp.x, bp.y, bp.z
 		));
-		if (res)original(_this, id, cbp);
 	}
+	if (res)original(_this, id, pkt);
 }
 Hook(世界爆炸, bool, "?explode@Level@@QEAAXAEAVBlockSource@@PEAVActor@@AEBVVec3@@M_N3M3@Z",
 	Level* _this, BlockSource* bs, Actor* a3, Vec3 pos, float a5, bool a6, bool a7, float a8, bool a9) {
@@ -1160,9 +1160,8 @@ void init() {
 }
 int DllMain(VA, int dwReason, VA) {
 	if (dwReason == 1) {
-		ios::sync_with_stdio(false);
 		init();
-		puts("[BDSpyrunner] v0.2.3 loaded.");
+		puts("[BDSpyrunner] v0.2.4 loaded.");
 	}
 	return 1;
 }
